@@ -1,31 +1,36 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
-import { Target, Lock, Mail, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
+import { Target, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
+  const { login } = useAuthStore();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const response = await api('/auth/login', {
+      const res = await api('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
 
-      if (response.success) {
-        login(response.data.user, response.data.token);
-        navigate('/dashboard');
+      if (res.success) {
+        login(res.data.user, res.data.token, res.data.refreshToken, res.data.deveTrocarSenha);
+        if (res.data.deveTrocarSenha) {
+          navigate('/trocar-senha');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
@@ -35,95 +40,73 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-[#F37137] flex items-center justify-center shadow-lg">
+    <div className="min-h-screen flex bg-[#FAFAFA]">
+      {/* Left panel — brand */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#4E3205] via-[#6B4507] to-[#4E3205] items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHYtMXptMC00aDR2MWgtNHYtMXptMC00aDR2MWgtNHYtMXoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30" />
+        <div className="text-center z-10 px-8">
+          <div className="w-20 h-20 rounded-2xl bg-[#F37137] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-[#F37137]/30">
             <Target className="w-10 h-10 text-white" />
           </div>
+          <h1 className="text-5xl font-bold text-white mb-3">SGM</h1>
+          <p className="text-xl text-amber-200 mb-2">Sistema de Gestão de Metas</p>
+          <p className="text-white/60">Saritur Transportes</p>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-[#4E3205]">
-          SGM Corporativo
-        </h2>
-        <p className="mt-2 text-center text-sm text-[#6B7280]">
-          Sistema de Gestão de Metas Estratégicas
-        </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-10 border border-[#E5E7EB]">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+      {/* Right panel — form */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden mb-8 text-center">
+            <div className="w-14 h-14 rounded-xl bg-[#F37137] flex items-center justify-center mx-auto mb-3">
+              <Target className="w-7 h-7 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-[#4E3205]">SGM</h1>
+            <p className="text-gray-500">Sistema de Gestão de Metas</p>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
+            <h2 className="text-2xl font-bold text-[#4E3205] mb-1">Bem-vindo de volta</h2>
+            <p className="text-gray-500 mb-6 text-sm">Entre com suas credenciais para acessar o sistema</p>
+
             {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded mb-4 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-[#4E3205]">Email Corporativo</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-[#4E3205] mb-1.5">Email</label>
+                <input id="email" type="email" autoComplete="email" required
+                  placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#F37137] focus:border-[#F37137] transition-colors" />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-[#4E3205] mb-1.5">Senha</label>
+                <div className="relative">
+                  <input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required
+                    placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 text-sm focus:ring-2 focus:ring-[#F37137] focus:border-[#F37137] transition-colors" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:ring-[#F37137] focus:border-[#F37137] sm:text-sm transition-colors"
-                  placeholder="seu.email@saritur.com.br"
-                />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#4E3205]">Senha</label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:ring-[#F37137] focus:border-[#F37137] sm:text-sm transition-colors"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-[#F37137] focus:ring-[#F37137] border-gray-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-[#6B7280]">
-                  Lembrar-me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <a href="#" className="font-medium text-[#F37137] hover:text-[#d95f27]">
-                  Esqueceu a senha?
-                </a>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-[#F37137] hover:bg-[#d95f27] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F37137] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Entrando...' : 'Entrar no Sistema'}
+              <button type="submit" disabled={loading}
+                className="w-full py-3 bg-[#F37137] text-white font-medium rounded-xl hover:bg-[#d95f27] disabled:opacity-50 transition-all active:scale-[0.99] shadow-lg shadow-[#F37137]/20">
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Entrando...
+                  </span>
+                ) : 'Entrar'}
               </button>
-            </div>
-          </form>
+            </form>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-6">Saritur Transportes © {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

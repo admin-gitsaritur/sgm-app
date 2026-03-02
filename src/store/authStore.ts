@@ -13,21 +13,36 @@ interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  login: (user: User, token: string) => void;
+  deveTrocarSenha: boolean;
+  login: (user: User, token: string, refreshToken: string, deveTrocarSenha?: boolean) => void;
+  setToken: (token: string) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
+  user: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token'),
+  refreshToken: localStorage.getItem('refreshToken'),
   isAuthenticated: !!localStorage.getItem('token'),
-  login: (user, token) => {
+  deveTrocarSenha: localStorage.getItem('deveTrocarSenha') === 'true',
+  login: (user, token, refreshToken, deveTrocarSenha = false) => {
     localStorage.setItem('token', token);
-    set({ user, token, isAuthenticated: true });
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('deveTrocarSenha', String(deveTrocarSenha));
+    set({ user, token, refreshToken, isAuthenticated: true, deveTrocarSenha });
+  },
+  setToken: (token) => {
+    localStorage.setItem('token', token);
+    set({ token });
   },
   logout: () => {
     localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false });
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('deveTrocarSenha');
+    set({ user: null, token: null, refreshToken: null, isAuthenticated: false, deveTrocarSenha: false });
   },
 }));

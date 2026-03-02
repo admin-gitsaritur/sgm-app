@@ -6,15 +6,15 @@ export const logAudit = (
   acao: string,
   entidade: string,
   entidadeId: string,
-  dadosAnteriores: any = null,
-  dadosNovos: any = null,
-  ip: string = '',
-  userAgent: string = ''
+  dadosAnteriores: unknown = null,
+  dadosNovos: unknown = null,
+  ip: string | undefined = '',
+  userAgent: string | string[] | undefined = ''
 ) => {
-  db.prepare(\`
+  db.prepare(`
     INSERT INTO auditoria (id, timestamp, userId, acao, entidade, entidadeId, dadosAnteriores, dadosNovos, ip, userAgent)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  \`).run(
+  `).run(
     crypto.randomUUID(),
     new Date().toISOString(),
     userId,
@@ -23,7 +23,7 @@ export const logAudit = (
     entidadeId,
     dadosAnteriores ? JSON.stringify(dadosAnteriores) : null,
     dadosNovos ? JSON.stringify(dadosNovos) : null,
-    ip,
-    userAgent
+    ip || '',
+    typeof userAgent === 'string' ? userAgent : (userAgent?.[0] || '')
   );
 };
