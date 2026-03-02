@@ -1,0 +1,16 @@
+import { Router } from 'express';
+import { authRouter } from './auth.js';
+import { metasRouter } from './metas.js';
+import { projetosRouter } from './projetos.js';
+import { indicadoresRouter } from './indicadores.js';
+import { usuariosRouter } from './usuarios.js';
+import { auditoriaRouter } from './auditoria.js';
+
+export const apiRouter = Router();
+
+apiRouter.use('/auth', authRouter);
+apiRouter.use('/metas', metasRouter);
+apiRouter.use('/projetos', projetosRouter);
+apiRouter.use('/indicadores', indicadoresRouter);
+apiRouter.use('/usuarios', usuariosRouter);
+apiRouter.use('/auditoria', auditoriaRouter);
