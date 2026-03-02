@@ -1,0 +1,42 @@
+# Dependencies (reinstalled inside container)
+node_modules
+
+# Build artifacts
+dist
+
+# SQLite database (should be mounted as volume)
+*.sqlite
+database.sqlite
+
+# Git
+.git
+.gitignore
+
+# IDE / OS
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs and metadata
+README.md
+metadata.json
+*.md
+
+# Agent/AI config
+.agent
+.agents
+_agent
+_agents
+.gemini
