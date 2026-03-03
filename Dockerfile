@@ -1,6 +1,7 @@
 # ============================================================
 # SGM App - Dockerfile
 # Multi-stage build: deps → build frontend → production runner
+# Stack: Node 22 + PostgreSQL (pg driver) + Vite SPA
 # ============================================================
 
 # ── Stage 1: Install dependencies ──────────────────────────
@@ -11,21 +12,23 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY package.json package-lock.json ./
 
-# Install ALL dependencies (dev included for build stage)
-# better-sqlite3 requires build tools for native compilation
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 make g++ && \
-    npm ci && \
-    apt-get purge -y python3 make g++ && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
+# pg driver is pure JS — no native build tools needed
+RUN npm ci --omit=dev
+
+# Also install dev deps in a separate layer for the build stage
+FROM node:22-slim AS dev-deps
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # ── Stage 2: Build frontend assets ────────────────────────
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=dev-deps /app/node_modules ./node_modules
 COPY . .
 
 # Build the Vite SPA → outputs to /app/dist
@@ -36,12 +39,12 @@ FROM node:22-slim AS runner
 
 WORKDIR /app
 
-# Install only what's needed for native modules at runtime
+# Install tini for proper signal handling + curl for healthcheck
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends tini && \
+    apt-get install -y --no-install-recommends tini curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy node_modules from deps stage (includes better-sqlite3 native build)
+# Copy production node_modules (no dev deps)
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy built frontend assets
@@ -51,15 +54,16 @@ COPY --from=builder /app/dist ./dist
 COPY server.ts tsconfig.json package.json ./
 COPY src/server ./src/server
 
-# Create data directory for SQLite persistence
-RUN mkdir -p /app/data
-
 # Environment
 ENV NODE_ENV=production
 ENV PORT=3000
 
 # Expose port
 EXPOSE 3000
+
+# Healthcheck — verifica se o server responde
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Use tini as init system for proper signal handling
 ENTRYPOINT ["tini", "--"]

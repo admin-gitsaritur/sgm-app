@@ -33,6 +33,17 @@ async function startServer() {
   // Body parser with size limit
   app.use(express.json({ limit: '1mb' }));
 
+  // Health check (before rate limiter so it's always accessible)
+  app.get('/api/health', async (_req: express.Request, res: express.Response) => {
+    try {
+      const { query } = await import('./src/server/db.js');
+      await query('SELECT 1');
+      res.json({ status: 'ok', uptime: process.uptime(), db: 'connected' });
+    } catch {
+      res.status(503).json({ status: 'degraded', uptime: process.uptime(), db: 'disconnected' });
+    }
+  });
+
   // Rate limiting — login endpoint
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
