@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { query } from '../db.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import type { AuditLog } from '../types/index.js';
 
@@ -7,7 +7,7 @@ export const auditoriaRouter = Router();
 auditoriaRouter.use(authenticate);
 
 // ── GET / — List with pagination and filters ──────────────
-auditoriaRouter.get('/', authorize(['ADMIN']), (req: AuthRequest, res) => {
+auditoriaRouter.get('/', authorize(['ADMIN']), async (req: AuthRequest, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
   const offset = (page - 1) * limit;
@@ -15,32 +15,33 @@ auditoriaRouter.get('/', authorize(['ADMIN']), (req: AuthRequest, res) => {
 
   let where = '1=1';
   const params: unknown[] = [];
+  let idx = 1;
 
-  if (userId) { where += ' AND a.userId = ?'; params.push(userId); }
-  if (entidade) { where += ' AND a.entidade = ?'; params.push(entidade); }
-  if (acao) { where += ' AND a.acao = ?'; params.push(acao); }
-  if (dataInicio) { where += ' AND a.timestamp >= ?'; params.push(dataInicio); }
-  if (dataFim) { where += ' AND a.timestamp <= ?'; params.push(dataFim); }
+  if (userId) { where += ` AND a."userId" = $${idx++}`; params.push(userId); }
+  if (entidade) { where += ` AND a.entidade = $${idx++}`; params.push(entidade); }
+  if (acao) { where += ` AND a.acao = $${idx++}`; params.push(acao); }
+  if (dataInicio) { where += ` AND a."timestamp" >= $${idx++}`; params.push(dataInicio); }
+  if (dataFim) { where += ` AND a."timestamp" <= $${idx++}`; params.push(dataFim); }
 
-  const total = db.prepare(`SELECT COUNT(*) as count FROM auditoria a WHERE ${where}`).get(...params) as { count: number };
+  try {
+    const totalResult = await query(`SELECT COUNT(*) as count FROM auditoria a WHERE ${where}`, params);
+    const total = parseInt(totalResult.rows[0].count);
 
-  const logs = db.prepare(`
-    SELECT a.*, u.nome as userName
-    FROM auditoria a
-    LEFT JOIN users u ON u.id = a.userId
-    WHERE ${where}
-    ORDER BY a.timestamp DESC LIMIT ? OFFSET ?
-  `).all(...params, limit, offset) as (AuditLog & { userName: string })[];
+    const result = await query(`
+      SELECT a.*, u.nome as "userName"
+      FROM auditoria a
+      LEFT JOIN users u ON u.id = a."userId"
+      WHERE ${where}
+      ORDER BY a."timestamp" DESC LIMIT $${idx++} OFFSET $${idx++}
+    `, [...params, limit, offset]);
 
-  const parsed = logs.map(l => ({
-    ...l,
-    dadosAnteriores: l.dadosAnteriores ? JSON.parse(l.dadosAnteriores) : null,
-    dadosNovos: l.dadosNovos ? JSON.parse(l.dadosNovos) : null,
-  }));
-
-  res.json({
-    success: true,
-    data: parsed,
-    meta: { page, limit, total: total.count, totalPages: Math.ceil(total.count / limit) },
-  });
+    res.json({
+      success: true,
+      data: result.rows,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error('Erro ao listar auditoria:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });

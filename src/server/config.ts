@@ -16,12 +16,24 @@ if (!process.env.JWT_SECRET) {
 }
 
 export const config = {
+    // Database
+    databaseUrl: getEnv('DATABASE_URL', 'postgres://localhost:5432/sgm'),
+
+    // JWT
     jwtSecret: process.env.JWT_SECRET || generatedSecret,
     jwtAccessExpiry: '15m',
     jwtRefreshExpiry: '7d',
+
+    // Security
     bcryptRounds: 12,
     maxLoginAttempts: 5,
     lockoutMinutes: 30,
+
+    // Server
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     port: parseInt(process.env.PORT || '3000', 10),
+
+    // Google OAuth
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
 };

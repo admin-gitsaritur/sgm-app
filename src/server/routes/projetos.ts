@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { query, pool } from '../db.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createProjetoSchema, updateProjetoSchema } from '../schemas/index.js';
@@ -11,140 +11,164 @@ import type { Projeto, Meta } from '../types/index.js';
 export const projetosRouter = Router();
 projetosRouter.use(authenticate);
 
-function recalcularPesos(metaId: string) {
-  const projetos = db.prepare(
-    'SELECT id, contribuicaoEsperadaCentavos FROM projetos WHERE metaId = ? AND deletedAt IS NULL AND status != ?'
-  ).all(metaId, 'CANCELADO') as { id: string; contribuicaoEsperadaCentavos: number }[];
-
-  const somaTotal = projetos.reduce((acc, p) => acc.plus(p.contribuicaoEsperadaCentavos), new Decimal(0));
-
+async function recalcularPesos(metaId: string) {
+  const result = await query(
+    'SELECT id, "contribuicaoEsperadaCentavos" FROM projetos WHERE "metaId" = $1 AND "deletedAt" IS NULL AND status != $2',
+    [metaId, 'CANCELADO']
+  );
+  const projetos = result.rows;
+  const somaTotal = projetos.reduce((acc: Decimal, p: any) => acc.plus(p.contribuicaoEsperadaCentavos), new Decimal(0));
   if (somaTotal.isZero()) return;
 
   const now = new Date().toISOString();
-  const stmt = db.prepare('UPDATE projetos SET pesoAutomatico = ?, atualizadoEm = ? WHERE id = ?');
-
   for (const p of projetos) {
     const peso = new Decimal(p.contribuicaoEsperadaCentavos).dividedBy(somaTotal).toNumber();
-    stmt.run(peso, now, p.id);
+    await query('UPDATE projetos SET "pesoAutomatico" = $1, "atualizadoEm" = $2 WHERE id = $3', [peso, now, p.id]);
   }
 }
 
-// ── GET / — List with pagination ──────────────────────────
-projetosRouter.get('/', (req: AuthRequest, res) => {
+// ── GET / ─────────────────────────────────────────────────
+projetosRouter.get('/', async (req: AuthRequest, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
   const offset = (page - 1) * limit;
   const metaId = req.query.metaId as string;
 
-  let where = 'p.deletedAt IS NULL';
+  let where = 'p."deletedAt" IS NULL';
   const params: unknown[] = [];
-  if (metaId) { where += ' AND p.metaId = ?'; params.push(metaId); }
+  let idx = 1;
+  if (metaId) { where += ` AND p."metaId" = $${idx++}`; params.push(metaId); }
 
-  const total = db.prepare(`SELECT COUNT(*) as count FROM projetos p WHERE ${where}`).get(...params) as { count: number };
-  const projetos = db.prepare(`
-    SELECT p.*, m.nome as metaNome FROM projetos p
-    LEFT JOIN metas m ON m.id = p.metaId
-    WHERE ${where} ORDER BY p.criadoEm DESC LIMIT ? OFFSET ?
-  `).all(...params, limit, offset) as (Projeto & { metaNome: string })[];
+  try {
+    const totalResult = await query(`SELECT COUNT(*) as count FROM projetos p WHERE ${where}`, params);
+    const total = parseInt(totalResult.rows[0].count);
 
-  const parsed = projetos.map(p => ({
-    ...p,
-    responsaveis: JSON.parse(p.responsaveis),
-  }));
+    const result = await query(`
+      SELECT p.*, m.nome as "metaNome" FROM projetos p
+      LEFT JOIN metas m ON m.id = p."metaId"
+      WHERE ${where} ORDER BY p."criadoEm" DESC LIMIT $${idx++} OFFSET $${idx++}
+    `, [...params, limit, offset]);
 
-  res.json({
-    success: true,
-    data: parsed,
-    meta: { page, limit, total: total.count, totalPages: Math.ceil(total.count / limit) },
-  });
+    res.json({
+      success: true,
+      data: result.rows,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error('Erro ao listar projetos:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });
 
 // ── GET /:id ──────────────────────────────────────────────
-projetosRouter.get('/:id', (req: AuthRequest, res) => {
-  const projeto = db.prepare('SELECT * FROM projetos WHERE id = ? AND deletedAt IS NULL').get(req.params.id) as Projeto | undefined;
-  if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
-
-  res.json({ success: true, data: { ...projeto, responsaveis: JSON.parse(projeto.responsaveis) } });
+projetosRouter.get('/:id', async (req: AuthRequest, res) => {
+  try {
+    const result = await query('SELECT * FROM projetos WHERE id = $1 AND "deletedAt" IS NULL', [req.params.id]);
+    const projeto = result.rows[0];
+    if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
+    res.json({ success: true, data: projeto });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });
 
 // ── POST / — Create ──────────────────────────────────────
-projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoSchema), (req: AuthRequest, res) => {
+projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoSchema), async (req: AuthRequest, res) => {
   const { metaId, nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis } = req.body;
 
-  const meta = db.prepare('SELECT * FROM metas WHERE id = ? AND deletedAt IS NULL').get(metaId) as Meta | undefined;
-  if (!meta) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
+  try {
+    const metaResult = await query('SELECT * FROM metas WHERE id = $1 AND "deletedAt" IS NULL', [metaId]);
+    if (metaResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
 
-  const contribuicaoCentavos = Math.round(contribuicaoEsperada * 100);
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+    const contribuicaoCentavos = Math.round(contribuicaoEsperada * 100);
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
 
-  db.transaction(() => {
-    db.prepare(`
-      INSERT INTO projetos (id, metaId, nome, contribuicaoEsperadaCentavos, pesoAutomatico, prazoInicio, prazoFim, responsavelPrincipal, responsaveis, status, criadoPor, criadoEm, atualizadoEm)
-      VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, metaId, nome, contribuicaoCentavos, prazoInicio, prazoFim, responsavelPrincipal, JSON.stringify(responsaveis), 'NAO_INICIADO', req.user!.id, now, now);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`
+        INSERT INTO projetos (id, "metaId", nome, "contribuicaoEsperadaCentavos", "pesoAutomatico", "prazoInicio", "prazoFim", "responsavelPrincipal", responsaveis, status, "criadoPor", "criadoEm", "atualizadoEm")
+        VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, $12)
+      `, [id, metaId, nome, contribuicaoCentavos, prazoInicio, prazoFim, responsavelPrincipal, JSON.stringify(responsaveis), 'NAO_INICIADO', req.user!.id, now, now]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
 
-    recalcularPesos(metaId);
-  })();
+    await recalcularPesos(metaId);
+    await logAudit(req.user!.id, 'CREATE', 'Projeto', id, null, req.body, req.ip, req.headers['user-agent']);
 
-  logAudit(req.user!.id, 'CREATE', 'Projeto', id, null, req.body, req.ip, req.headers['user-agent']);
-
-  res.json({ success: true, data: { id } });
+    res.json({ success: true, data: { id } });
+  } catch (err) {
+    console.error('Erro ao criar projeto:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });
 
 // ── PUT /:id — Update ─────────────────────────────────────
-projetosRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateProjetoSchema), (req: AuthRequest, res) => {
-  const projeto = db.prepare('SELECT * FROM projetos WHERE id = ? AND deletedAt IS NULL').get(req.params.id) as Projeto | undefined;
-  if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
+projetosRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateProjetoSchema), async (req: AuthRequest, res) => {
+  try {
+    const result = await query('SELECT * FROM projetos WHERE id = $1 AND "deletedAt" IS NULL', [req.params.id]);
+    const projeto = result.rows[0];
+    if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
 
-  const { nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis, status } = req.body;
-  const now = new Date().toISOString();
-  const contribuicaoCentavos = contribuicaoEsperada !== undefined ? Math.round(contribuicaoEsperada * 100) : projeto.contribuicaoEsperadaCentavos;
+    const { nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis, status } = req.body;
+    const now = new Date().toISOString();
+    const contribuicaoCentavos = contribuicaoEsperada !== undefined ? Math.round(contribuicaoEsperada * 100) : projeto.contribuicaoEsperadaCentavos;
 
-  db.transaction(() => {
-    db.prepare(`
-      UPDATE projetos SET nome = ?, contribuicaoEsperadaCentavos = ?, prazoInicio = ?, prazoFim = ?,
-      responsavelPrincipal = ?, responsaveis = ?, status = ?, atualizadoEm = ? WHERE id = ?
-    `).run(
+    await query(`
+      UPDATE projetos SET nome = $1, "contribuicaoEsperadaCentavos" = $2, "prazoInicio" = $3, "prazoFim" = $4,
+      "responsavelPrincipal" = $5, responsaveis = $6, status = $7, "atualizadoEm" = $8 WHERE id = $9
+    `, [
       nome || projeto.nome, contribuicaoCentavos,
       prazoInicio || projeto.prazoInicio, prazoFim || projeto.prazoFim,
       responsavelPrincipal || projeto.responsavelPrincipal,
       responsaveis ? JSON.stringify(responsaveis) : projeto.responsaveis,
-      status || projeto.status, now, projeto.id
-    );
+      status || projeto.status, now, projeto.id,
+    ]);
 
     if (contribuicaoEsperada !== undefined) {
-      recalcularPesos(projeto.metaId);
+      await recalcularPesos(projeto.metaId);
     }
-  })();
 
-  logAudit(req.user!.id, 'UPDATE', 'Projeto', projeto.id, projeto, req.body, req.ip, req.headers['user-agent']);
-
-  res.json({ success: true, data: { id: projeto.id } });
+    await logAudit(req.user!.id, 'UPDATE', 'Projeto', projeto.id, projeto, req.body, req.ip, req.headers['user-agent']);
+    res.json({ success: true, data: { id: projeto.id } });
+  } catch (err) {
+    console.error('Erro ao atualizar projeto:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });
 
 // ── DELETE /:id — Soft delete ─────────────────────────────
-projetosRouter.delete('/:id', authorize(['ADMIN', 'GESTOR']), (req: AuthRequest, res) => {
-  const projeto = db.prepare('SELECT * FROM projetos WHERE id = ? AND deletedAt IS NULL').get(req.params.id) as Projeto | undefined;
-  if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
+projetosRouter.delete('/:id', authorize(['ADMIN', 'GESTOR']), async (req: AuthRequest, res) => {
+  try {
+    const result = await query('SELECT * FROM projetos WHERE id = $1 AND "deletedAt" IS NULL', [req.params.id]);
+    const projeto = result.rows[0];
+    if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
 
-  const indicadoresAtivos = db.prepare('SELECT COUNT(*) as count FROM indicadores WHERE projetoId = ? AND deletedAt IS NULL').get(projeto.id) as { count: number };
-
-  const now = new Date().toISOString();
-  db.transaction(() => {
-    db.prepare('UPDATE projetos SET status = ?, deletedAt = ?, atualizadoEm = ? WHERE id = ?')
-      .run('CANCELADO', now, now, projeto.id);
-
-    // Soft delete child indicadores
-    if (indicadoresAtivos.count > 0) {
-      db.prepare('UPDATE indicadores SET deletedAt = ?, atualizadoEm = ? WHERE projetoId = ? AND deletedAt IS NULL')
-        .run(now, now, projeto.id);
+    const now = new Date().toISOString();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE projetos SET status = $1, "deletedAt" = $2, "atualizadoEm" = $3 WHERE id = $4', ['CANCELADO', now, now, projeto.id]);
+      await client.query('UPDATE indicadores SET "deletedAt" = $1, "atualizadoEm" = $2 WHERE "projetoId" = $3 AND "deletedAt" IS NULL', [now, now, projeto.id]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
 
-    recalcularPesos(projeto.metaId);
-  })();
+    await recalcularPesos(projeto.metaId);
+    await logAudit(req.user!.id, 'DELETE', 'Projeto', projeto.id, projeto, null, req.ip, req.headers['user-agent']);
 
-  logAudit(req.user!.id, 'DELETE', 'Projeto', projeto.id, projeto, null, req.ip, req.headers['user-agent']);
-
-  res.json({ success: true, data: { id: projeto.id } });
+    res.json({ success: true, data: { id: projeto.id } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
 });

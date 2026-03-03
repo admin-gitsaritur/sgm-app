@@ -18,6 +18,7 @@ interface AuthState {
   deveTrocarSenha: boolean;
   login: (user: User, token: string, refreshToken: string, deveTrocarSenha?: boolean) => void;
   setToken: (token: string) => void;
+  clearDeveTrocarSenha: () => void;
   logout: () => void;
 }
 
@@ -37,6 +38,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setToken: (token) => {
     localStorage.setItem('token', token);
     set({ token });
+  },
+  clearDeveTrocarSenha: () => {
+    localStorage.setItem('deveTrocarSenha', 'false');
+    set({ deveTrocarSenha: false });
   },
   logout: () => {
     localStorage.removeItem('token');

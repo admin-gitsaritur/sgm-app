@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { apiRouter } from './src/server/routes/index.js';
 import { config } from './src/server/config.js';
+import { initDb } from './src/server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,6 +76,15 @@ async function startServer() {
     app.use('*', (req: express.Request, res: express.Response) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
+  }
+
+  // Initialize PostgreSQL database (create tables if needed)
+  try {
+    await initDb();
+  } catch (err: any) {
+    console.error('⚠️  Não foi possível conectar ao PostgreSQL:', err.message);
+    console.error('   O servidor continuará rodando, mas as rotas de API que dependem do banco irão falhar.');
+    console.error('   Verifique a variável DATABASE_URL no .env');
   }
 
   app.listen(PORT, '0.0.0.0', () => {
