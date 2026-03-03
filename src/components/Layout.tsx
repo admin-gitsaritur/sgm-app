@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { Button } from './ui/Button';
 import {
   LayoutDashboard, Target, Briefcase, BarChart2, Users, Shield,
-  LogOut, Menu, X, Bell, Search
+  LogOut, Menu, X, Bell, Search, UserCheck, FileText, Settings
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -13,8 +13,11 @@ const menuItems = [
   { path: '/metas', label: 'Metas', icon: Target, roles: ['ADMIN'] },
   { path: '/projetos', label: 'Projetos', icon: Briefcase, roles: ['ADMIN', 'GESTOR'] },
   { path: '/indicadores', label: 'Indicadores', icon: BarChart2, roles: ['ADMIN', 'GESTOR', 'OPERADOR'] },
+  { path: '/responsaveis', label: 'Responsáveis', icon: UserCheck, roles: ['ADMIN', 'GESTOR'] },
+  { path: '/relatorios', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'GESTOR'] },
   { path: '/usuarios', label: 'Usuários', icon: Users, roles: ['ADMIN'] },
   { path: '/auditoria', label: 'Auditoria', icon: Shield, roles: ['ADMIN'] },
+  { path: '/configuracoes', label: 'Configurações', icon: Settings, roles: ['ADMIN'] },
 ];
 
 export const Layout = () => {

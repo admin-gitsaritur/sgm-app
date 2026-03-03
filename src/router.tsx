@@ -10,6 +10,9 @@ import { Projetos } from './pages/Projetos';
 import { Indicadores } from './pages/Indicadores';
 import { Usuarios } from './pages/Usuarios';
 import { Auditoria } from './pages/Auditoria';
+import { Responsaveis } from './pages/Responsaveis';
+import { Relatorios } from './pages/Relatorios';
+import { Configuracoes } from './pages/Configuracoes';
 import { Login } from './pages/Login';
 import { TrocarSenha } from './pages/TrocarSenha';
 
@@ -27,7 +30,7 @@ const AnimatedRoutes = () => {
   const location = useLocation();
 
   return (
-    <PageTransition key={location.pathname}>
+    <PageTransition>
       <Routes location={location}>
         <Route path="/login" element={<Login />} />
         <Route path="/trocar-senha" element={<TrocarSenha />} />
@@ -38,8 +41,11 @@ const AnimatedRoutes = () => {
           <Route path="metas" element={<ProtectedRoute roles={['ADMIN']}><Metas /></ProtectedRoute>} />
           <Route path="projetos" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Projetos /></ProtectedRoute>} />
           <Route path="indicadores" element={<ProtectedRoute roles={['ADMIN', 'GESTOR', 'OPERADOR']}><Indicadores /></ProtectedRoute>} />
+          <Route path="responsaveis" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Responsaveis /></ProtectedRoute>} />
+          <Route path="relatorios" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Relatorios /></ProtectedRoute>} />
           <Route path="usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />
           <Route path="auditoria" element={<ProtectedRoute roles={['ADMIN']}><Auditoria /></ProtectedRoute>} />
+          <Route path="configuracoes" element={<ProtectedRoute roles={['ADMIN']}><Configuracoes /></ProtectedRoute>} />
         </Route>
       </Routes>
     </PageTransition>
