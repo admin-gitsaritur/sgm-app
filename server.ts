@@ -17,6 +17,10 @@ async function startServer() {
   const app = express();
   const PORT = config.port;
 
+  // Trust proxy — necessário quando atrás de reverse proxy (EasyPanel, nginx, traefik)
+  // Permite que express-rate-limit leia o IP real via X-Forwarded-For
+  app.set('trust proxy', 1);
+
   // Security headers
   app.use(helmet({
     contentSecurityPolicy: false, // Allow inline scripts for Vite dev

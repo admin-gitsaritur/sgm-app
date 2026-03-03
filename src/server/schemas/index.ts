@@ -5,11 +5,12 @@ import { z } from 'zod';
 export const createMetaSchema = z.object({
     nome: z.string().min(3, 'Mínimo 3 caracteres').max(200).trim(),
     valorMeta: z.number().positive('Deve ser positivo').finite(),
+    unidadeMeta: z.enum(['BRL', 'PERCENTUAL', 'UNIDADE']).default('BRL'),
     ano: z.number().int().min(2020).max(2100),
     periodoInicio: z.string().min(1, 'Obrigatório'),
     periodoFim: z.string().min(1, 'Obrigatório'),
-    indicadorMacro: z.string().min(2).max(200).trim(),
-    periodicidadeAtualizacao: z.enum(['MENSAL', 'QUINZENAL', 'SEMANAL']),
+    indicadorMacro: z.string().max(200).trim().optional().nullable(),
+    periodicidadeAtualizacao: z.enum(['SEMANAL', 'QUINZENAL', 'MENSAL', 'TRIMESTRAL', 'QUADRIMESTRAL', 'SEMESTRAL']),
     tipoCurva: z.enum(['LINEAR', 'PERSONALIZADA']),
     curvaPersonalizada: z.array(z.number().nonnegative()).length(12).optional().nullable(),
 });

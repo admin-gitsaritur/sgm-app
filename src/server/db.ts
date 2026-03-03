@@ -71,11 +71,12 @@ export async function initDb() {
         id TEXT PRIMARY KEY,
         nome TEXT NOT NULL,
         "valorMetaCentavos" BIGINT NOT NULL,
+        "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL' CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE')),
         ano INTEGER NOT NULL,
         "periodoInicio" DATE NOT NULL,
         "periodoFim" DATE NOT NULL,
-        "indicadorMacro" TEXT NOT NULL,
-        "periodicidadeAtualizacao" TEXT NOT NULL CHECK("periodicidadeAtualizacao" IN ('MENSAL','QUINZENAL','SEMANAL')),
+        "indicadorMacro" TEXT,
+        "periodicidadeAtualizacao" TEXT NOT NULL CHECK("periodicidadeAtualizacao" IN ('SEMANAL','QUINZENAL','MENSAL','TRIMESTRAL','QUADRIMESTRAL','SEMESTRAL')),
         "tipoCurva" TEXT NOT NULL CHECK("tipoCurva" IN ('LINEAR','PERSONALIZADA')),
         "curvaPersonalizada" JSONB,
         status TEXT NOT NULL CHECK(status IN ('ATIVA','CONCLUIDA','CANCELADA')),
@@ -178,6 +179,25 @@ export async function initDb() {
       CREATE TRIGGER prevent_audit_delete
         BEFORE DELETE ON auditoria
         FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
+    `);
+
+    // ── Migrations para bancos existentes ──
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='metas' AND column_name='unidadeMeta') THEN
+          ALTER TABLE metas ADD COLUMN "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL';
+        END IF;
+      END $$;
+
+      ALTER TABLE metas ALTER COLUMN "indicadorMacro" DROP NOT NULL;
+
+      ALTER TABLE metas DROP CONSTRAINT IF EXISTS metas_periodicidadeAtualizacao_check;
+      ALTER TABLE metas ADD CONSTRAINT metas_periodicidadeAtualizacao_check
+        CHECK("periodicidadeAtualizacao" IN ('SEMANAL','QUINZENAL','MENSAL','TRIMESTRAL','QUADRIMESTRAL','SEMESTRAL'));
+
+      ALTER TABLE metas DROP CONSTRAINT IF EXISTS metas_unidadeMeta_check;
+      ALTER TABLE metas ADD CONSTRAINT metas_unidadeMeta_check
+        CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE'));
     `);
 
     await client.query('COMMIT');

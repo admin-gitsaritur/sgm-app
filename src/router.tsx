@@ -1,8 +1,8 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { PageTransition } from './components/PageTransition';
+import { PageLoader } from './components/ui/Spinner';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Metas } from './pages/Metas';
@@ -15,6 +15,7 @@ import { Relatorios } from './pages/Relatorios';
 import { Configuracoes } from './pages/Configuracoes';
 import { Login } from './pages/Login';
 import { TrocarSenha } from './pages/TrocarSenha';
+import { EsqueciSenha } from './pages/EsqueciSenha';
 
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
   const { isAuthenticated, user, deveTrocarSenha } = useAuthStore();
@@ -26,14 +27,13 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?
   return <>{children}</>;
 };
 
-const AnimatedRoutes = () => {
-  const location = useLocation();
-
+const AppRoutes = () => {
   return (
-    <PageTransition>
-      <Routes location={location}>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/trocar-senha" element={<TrocarSenha />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenha />} />
 
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
@@ -48,7 +48,7 @@ const AnimatedRoutes = () => {
           <Route path="configuracoes" element={<ProtectedRoute roles={['ADMIN']}><Configuracoes /></ProtectedRoute>} />
         </Route>
       </Routes>
-    </PageTransition>
+    </Suspense>
   );
 };
 
@@ -56,7 +56,7 @@ export const AppRouter = () => {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AnimatedRoutes />
+        <AppRoutes />
       </BrowserRouter>
     </ErrorBoundary>
   );

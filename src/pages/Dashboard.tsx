@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { CardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import {
   Target, TrendingUp, AlertTriangle, DollarSign,
-  BarChart2, ChevronRight, RefreshCw
+  BarChart2, ChevronRight, RefreshCw, Gauge
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, BarChart, Bar
+  ResponsiveContainer, Legend, BarChart, Bar,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
 
 // ─── Componentes locais do Dashboard ─────────────────────────────────
@@ -197,7 +198,7 @@ export const Dashboard = () => {
             <div className="p-6 flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Target className="w-6 h-6 text-primary" />
+                  <Gauge className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-brown flex items-center gap-2">
@@ -298,6 +299,107 @@ export const Dashboard = () => {
             )}
           </div>
 
+          {/* ── Gauge + Heatmap + Radar ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Gauge / Velocímetro */}
+            <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 p-6 flex flex-col items-center">
+              <h3 className="text-sm font-semibold text-brown mb-4 self-start">Atingimento Global</h3>
+              <svg viewBox="0 0 200 130" className="w-48 h-auto">
+                {/* Background arc */}
+                <path d="M 20 120 A 80 80 0 0 1 180 120" fill="none" stroke="#E5E7EB" strokeWidth="14" strokeLinecap="round" />
+                {/* Value arc */}
+                {(() => {
+                  const pct = Math.min(item.percentualAtingimento, 100) / 100;
+                  const angle = Math.PI * (1 - pct);
+                  const x = 100 - 80 * Math.cos(angle);
+                  const y = 120 - 80 * Math.sin(angle);
+                  const largeArc = pct > 0.5 ? 1 : 0;
+                  const color = item.semaforo === 'VERDE' ? '#10B981' : item.semaforo === 'AMARELO' ? '#F59E0B' : '#EF4444';
+                  return (
+                    <path
+                      d={`M 20 120 A 80 80 0 ${largeArc} 1 ${x} ${y}`}
+                      fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 1s ease' }}
+                    />
+                  );
+                })()}
+                {/* Text */}
+                <text x="100" y="100" textAnchor="middle" className="fill-brown text-2xl font-bold" style={{ fontSize: '28px', fontWeight: 700 }}>
+                  {item.percentualAtingimento.toFixed(1)}%
+                </text>
+                <text x="100" y="118" textAnchor="middle" className="fill-brown/40" style={{ fontSize: '10px' }}>
+                  de {formatCurrencyShort(item.meta.valorMetaCentavos)}
+                </text>
+              </svg>
+            </div>
+
+            {/* Heatmap de Indicadores */}
+            <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 p-6">
+              <h3 className="text-sm font-semibold text-brown mb-4">Heatmap — Indicadores</h3>
+              <div className="grid grid-cols-4 gap-1.5">
+                {item.projetos.flatMap((p: any) =>
+                  p.indicadores.map((ind: any) => {
+                    const pct = ind.percentualAtingido * 100;
+                    const color = pct >= 95 ? 'bg-emerald-400' : pct >= 85 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : pct >= 50 ? 'bg-amber-400' : 'bg-rose-400';
+                    return (
+                      <div
+                        key={ind.indicador.id}
+                        className={`${color} rounded-md h-8 cursor-default transition-transform hover:scale-110`}
+                        title={`${ind.indicador.nome}: ${pct.toFixed(1)}%`}
+                      />
+                    );
+                  })
+                )}
+                {item.projetos.flatMap((p: any) => p.indicadores).length === 0 && (
+                  <p className="col-span-4 text-xs text-brown/40 text-center py-4">Sem indicadores</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-4 justify-center">
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-400" /><span className="text-[10px] text-brown/40">≥95%</span></div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-300" /><span className="text-[10px] text-brown/40">85-95%</span></div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-amber-300" /><span className="text-[10px] text-brown/40">70-85%</span></div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-rose-400" /><span className="text-[10px] text-brown/40">&lt;70%</span></div>
+              </div>
+            </div>
+
+            {/* Radar de Responsáveis */}
+            <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 p-6">
+              <h3 className="text-sm font-semibold text-brown mb-4">Performance — Responsáveis</h3>
+              {(() => {
+                // Aggregate data per responsible
+                const respMap: Record<string, { nome: string; execucao: number[]; atrasados: number }> = {};
+                item.projetos.forEach((p: any) => {
+                  p.indicadores.forEach((ind: any) => {
+                    const id = ind.indicador.responsavel;
+                    if (!respMap[id]) respMap[id] = { nome: id.slice(0, 8), execucao: [], atrasados: 0 };
+                    respMap[id].execucao.push(ind.percentualAtingido * 100);
+                    if (ind.indicador.statusAtualizacao === 'ATRASADO') respMap[id].atrasados++;
+                  });
+                });
+                const radarData = Object.values(respMap).slice(0, 6).map(r => ({
+                  nome: r.nome,
+                  atingimento: Math.round(r.execucao.reduce((a, b) => a + b, 0) / r.execucao.length),
+                  pontualidade: Math.round(Math.max(0, 100 - r.atrasados * 25)),
+                }));
+                if (radarData.length === 0) return <p className="text-xs text-brown/40 text-center py-8">Sem dados de responsáveis</p>;
+                return (
+                  <div className="h-52">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData}>
+                        <PolarGrid stroke="#E5E7EB" />
+                        <PolarAngleAxis dataKey="nome" tick={{ fill: '#6B7280', fontSize: 10 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8 }} />
+                        <Radar name="Atingimento" dataKey="atingimento" stroke="#F37137" fill="#F37137" fillOpacity={0.2} strokeWidth={2} />
+                        <Radar name="Pontualidade" dataKey="pontualidade" stroke="#F6D317" fill="#F6D317" fillOpacity={0.1} strokeWidth={2} />
+                        <Tooltip />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
           {/* ── Projects Table ── */}
           {item.projetos.length > 0 && (
             <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 overflow-hidden">

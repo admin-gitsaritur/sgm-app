@@ -73,7 +73,7 @@ metasRouter.get('/:id', async (req: AuthRequest, res) => {
 
 // ── POST / — Create ──────────────────────────────────────
 metasRouter.post('/', authorize(['ADMIN']), validate(createMetaSchema), async (req: AuthRequest, res) => {
-  const { nome, valorMeta, ano, periodoInicio, periodoFim, indicadorMacro, periodicidadeAtualizacao, tipoCurva, curvaPersonalizada } = req.body;
+  const { nome, valorMeta, unidadeMeta, ano, periodoInicio, periodoFim, indicadorMacro, periodicidadeAtualizacao, tipoCurva, curvaPersonalizada } = req.body;
 
   const valorMetaCentavos = Math.round(valorMeta * 100);
 
@@ -98,9 +98,9 @@ metasRouter.post('/', authorize(['ADMIN']), validate(createMetaSchema), async (r
 
   try {
     await query(`
-      INSERT INTO metas (id, nome, "valorMetaCentavos", ano, "periodoInicio", "periodoFim", "indicadorMacro", "periodicidadeAtualizacao", "tipoCurva", "curvaPersonalizada", status, "criadoPor", "criadoEm", "atualizadoEm")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    `, [id, nome, valorMetaCentavos, ano, periodoInicio, periodoFim, indicadorMacro, periodicidadeAtualizacao, tipoCurva, curvaJson, 'ATIVA', req.user!.id, now, now]);
+      INSERT INTO metas (id, nome, "valorMetaCentavos", "unidadeMeta", ano, "periodoInicio", "periodoFim", "indicadorMacro", "periodicidadeAtualizacao", "tipoCurva", "curvaPersonalizada", status, "criadoPor", "criadoEm", "atualizadoEm")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `, [id, nome, valorMetaCentavos, unidadeMeta || 'BRL', ano, periodoInicio, periodoFim, indicadorMacro || null, periodicidadeAtualizacao, tipoCurva, curvaJson, 'ATIVA', req.user!.id, now, now]);
 
     await logAudit(req.user!.id, 'CREATE', 'Meta', id, null, req.body, req.ip, req.headers['user-agent']);
 
@@ -118,7 +118,7 @@ metasRouter.put('/:id', authorize(['ADMIN']), validate(updateMetaSchema), async 
     const meta = result.rows[0];
     if (!meta) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
 
-    const { nome, valorMeta, ano, periodoInicio, periodoFim, indicadorMacro, periodicidadeAtualizacao, tipoCurva, curvaPersonalizada, status } = req.body;
+    const { nome, valorMeta, unidadeMeta, ano, periodoInicio, periodoFim, indicadorMacro, periodicidadeAtualizacao, tipoCurva, curvaPersonalizada, status } = req.body;
 
     const newValorCentavos = valorMeta !== undefined ? Math.round(valorMeta * 100) : meta.valorMetaCentavos;
     const newTipoCurva = tipoCurva || meta.tipoCurva;
@@ -140,13 +140,14 @@ metasRouter.put('/:id', authorize(['ADMIN']), validate(updateMetaSchema), async 
       : (newTipoCurva === 'LINEAR' ? null : meta.curvaPersonalizada);
 
     await query(`
-      UPDATE metas SET nome = $1, "valorMetaCentavos" = $2, ano = $3, "periodoInicio" = $4, "periodoFim" = $5,
-      "indicadorMacro" = $6, "periodicidadeAtualizacao" = $7, "tipoCurva" = $8, "curvaPersonalizada" = $9,
-      status = $10, "atualizadoEm" = $11 WHERE id = $12
+      UPDATE metas SET nome = $1, "valorMetaCentavos" = $2, "unidadeMeta" = $3, ano = $4, "periodoInicio" = $5, "periodoFim" = $6,
+      "indicadorMacro" = $7, "periodicidadeAtualizacao" = $8, "tipoCurva" = $9, "curvaPersonalizada" = $10,
+      status = $11, "atualizadoEm" = $12 WHERE id = $13
     `, [
-      nome || meta.nome, newValorCentavos, ano || meta.ano,
+      nome || meta.nome, newValorCentavos, unidadeMeta || meta.unidadeMeta || 'BRL', ano || meta.ano,
       periodoInicio || meta.periodoInicio, periodoFim || meta.periodoFim,
-      indicadorMacro || meta.indicadorMacro, periodicidadeAtualizacao || meta.periodicidadeAtualizacao,
+      indicadorMacro !== undefined ? (indicadorMacro || null) : meta.indicadorMacro,
+      periodicidadeAtualizacao || meta.periodicidadeAtualizacao,
       newTipoCurva, curvaJson, status || meta.status, now, meta.id,
     ]);
 

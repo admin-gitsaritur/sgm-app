@@ -131,6 +131,12 @@ export const Login = () => {
             </Button>
           </form>
 
+          <div className="mt-4 text-center">
+            <a href="/esqueci-senha" className="text-primary text-sm font-medium hover:underline">
+              Esqueci minha senha
+            </a>
+          </div>
+
           <div className="mt-8 sm:mt-10 text-center text-sm text-brown/50">
             <p>Saritur © {new Date().getFullYear()}</p>
           </div>

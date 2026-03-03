@@ -6,8 +6,9 @@ import { query } from '../db.js';
 import { config } from '../config.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { loginSchema, trocarSenhaSchema, refreshTokenSchema, validarSenha } from '../schemas/index.js';
+import { loginSchema, trocarSenhaSchema, refreshTokenSchema, validarSenha, gerarSenhaTemporaria } from '../schemas/index.js';
 import { logAudit } from '../utils/audit.js';
+import { sendEmail, buildEmailHtml } from '../services/email.js';
 import type { User } from '../types/index.js';
 
 export const authRouter = Router();
@@ -276,6 +277,63 @@ authRouter.post('/trocar-senha', authenticate, validate(trocarSenhaSchema), asyn
 
     res.json({ success: true, data: { message: 'Senha alterada com sucesso' } });
   } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── POST /esqueci-senha ───────────────────────────────────
+authRouter.post('/esqueci-senha', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ success: false, error: 'Email obrigatório' });
+  }
+
+  try {
+    const result = await query('SELECT * FROM users WHERE email = $1 AND "deletedAt" IS NULL', [email.toLowerCase().trim()]);
+    const user = result.rows[0] as User | undefined;
+
+    // Sempre retornar sucesso para não expor existência de contas
+    if (!user) {
+      return res.json({ success: true, data: { message: 'Se o email estiver cadastrado, você receberá as instruções.' } });
+    }
+
+    // Gerar senha temporária
+    const senhaTemp = gerarSenhaTemporaria();
+    const newHash = await bcrypt.hash(senhaTemp, config.bcryptRounds);
+
+    await query(
+      `UPDATE users SET "senhaHash" = $1, "deveTrocarSenha" = true WHERE id = $2`,
+      [newHash, user.id]
+    );
+
+    // Enviar email com template Saritur
+    const html = buildEmailHtml({
+      title: 'Redefinição de Senha',
+      emoji: '🔑',
+      greeting: `Olá, ${user.nome}!`,
+      bodyText: 'Recebemos uma solicitação de redefinição de senha para sua conta no SGM — Sistema de Gestão de Metas.',
+      details: [
+        { label: 'Sua nova senha temporária', value: senhaTemp, highlight: true },
+      ],
+      extraText: 'Ao fazer login com essa senha, você será redirecionado para criar uma nova senha. Se você não solicitou esta redefinição, entre em contato com o administrador.',
+      ctaButton: {
+        label: 'Acessar o SGM',
+        url: config.corsOrigin || 'https://saritur-sgm-app.01brxh.easypanel.host',
+      },
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: 'SGM Saritur — Redefinição de Senha',
+      html,
+    });
+
+    await logAudit(user.id, 'RESET_SENHA', 'User', user.id, null, null, req.ip, req.headers['user-agent']);
+
+    res.json({ success: true, data: { message: 'Se o email estiver cadastrado, você receberá as instruções.' } });
+  } catch (err) {
+    console.error('Erro no esqueci-senha:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });

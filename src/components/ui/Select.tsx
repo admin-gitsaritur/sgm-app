@@ -128,7 +128,7 @@ function SelectContent({
           // Base
           "relative z-50 max-h-60 min-w-[8rem] overflow-hidden",
           "bg-white rounded-xl border border-stone-100",
-          "shadow-xl shadow-stone-200/50",
+          "shadow-[0_8px_30px_rgba(0,0,0,0.12)]",
           // Animations
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",

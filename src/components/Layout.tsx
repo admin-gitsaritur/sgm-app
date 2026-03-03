@@ -3,14 +3,14 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Button } from './ui/Button';
 import {
-  LayoutDashboard, Target, Briefcase, BarChart2, Users, Shield,
+  LayoutDashboard, Gauge, Briefcase, BarChart2, Users, Shield,
   LogOut, Menu, X, Bell, Search, UserCheck, FileText, Settings
 } from 'lucide-react';
 import clsx from 'clsx';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR'] },
-  { path: '/metas', label: 'Metas', icon: Target, roles: ['ADMIN'] },
+  { path: '/metas', label: 'Metas', icon: Gauge, roles: ['ADMIN'] },
   { path: '/projetos', label: 'Projetos', icon: Briefcase, roles: ['ADMIN', 'GESTOR'] },
   { path: '/indicadores', label: 'Indicadores', icon: BarChart2, roles: ['ADMIN', 'GESTOR', 'OPERADOR'] },
   { path: '/responsaveis', label: 'Responsáveis', icon: UserCheck, roles: ['ADMIN', 'GESTOR'] },
