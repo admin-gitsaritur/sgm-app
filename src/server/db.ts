@@ -180,32 +180,6 @@ export async function initDb() {
         FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
     `);
 
-    // ── Admin padrão ──
-    const adminCheck = await client.query('SELECT 1 FROM users WHERE email = $1', ['admin@saritur.com.br']);
-    if (adminCheck.rows.length === 0) {
-      const salt = bcrypt.genSaltSync(config.bcryptRounds);
-      const hash = bcrypt.hashSync('Admin@1234', salt);
-      await client.query(`
-        INSERT INTO users (id, cpf, nome, email, telefone, "senhaHash", role, ativo, "criadoEm", departamento, cargo, "deveTrocarSenha", "historicoSenhas")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      `, [
-        crypto.randomUUID(),
-        '00000000000',
-        'Administrador do Sistema',
-        'admin@saritur.com.br',
-        null,
-        hash,
-        'ADMIN',
-        true,
-        new Date().toISOString(),
-        'TI',
-        'Superintendente',
-        true,
-        JSON.stringify([hash]),
-      ]);
-      console.log('👤 Admin padrão criado: admin@saritur.com.br / Admin@1234');
-    }
-
     await client.query('COMMIT');
     console.log('✅ Banco PostgreSQL inicializado com sucesso');
   } catch (err) {
