@@ -1,18 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Button } from './ui/Button';
+import { Toaster } from './ui/Toast';
+import { UserAvatar } from './ui/UserAvatar';
 import {
-  LayoutDashboard, Gauge, Briefcase, BarChart2, Users, Shield,
-  LogOut, Menu, X, Bell, Search, UserCheck, FileText, Settings
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator,
+} from './ui/DropdownMenu';
+import {
+  Target, Gauge, Briefcase, BarChart2, Users, Shield,
+  LogOut, Menu, X, Bell, UserCheck, FileText, Settings, User, ChevronDown, GitBranch
 } from 'lucide-react';
 import clsx from 'clsx';
 
 const menuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR'] },
-  { path: '/metas', label: 'Metas', icon: Gauge, roles: ['ADMIN'] },
+  { path: '/dashboard', label: 'Dashboard', icon: Gauge, roles: ['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR'] },
+  { path: '/metas', label: 'Metas', icon: Target, roles: ['ADMIN'] },
   { path: '/projetos', label: 'Projetos', icon: Briefcase, roles: ['ADMIN', 'GESTOR'] },
   { path: '/indicadores', label: 'Indicadores', icon: BarChart2, roles: ['ADMIN', 'GESTOR', 'OPERADOR'] },
+  { path: '/mapeamento', label: 'Mapeamento', icon: GitBranch, roles: ['ADMIN', 'GESTOR'] },
   { path: '/responsaveis', label: 'Responsáveis', icon: UserCheck, roles: ['ADMIN', 'GESTOR'] },
   { path: '/relatorios', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'GESTOR'] },
   { path: '/usuarios', label: 'Usuários', icon: Users, roles: ['ADMIN'] },
@@ -31,7 +37,8 @@ export const Layout = () => {
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   const filteredMenu = menuItems.filter(item => user && item.roles.includes(user.role));
-  const initials = user?.nome?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
+  const nameParts = user?.nome?.split(' ') || [];
+  const displayName = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : nameParts[0] || 'Usuário';
 
   const handleLogout = () => {
     logout();
@@ -42,12 +49,13 @@ export const Layout = () => {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <>
       {/* Logo */}
-      <div className={clsx('h-16 flex items-center border-b border-stone-100', collapsed ? 'px-4 justify-center' : 'px-5')}>
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <img src="/brands/iso_saritur_branco.svg" alt="SGM" className="w-5 h-5" />
-        </div>
-        {!collapsed && (
-          <span className="ml-3 font-semibold text-brown text-lg tracking-tight">SGM</span>
+      <div className={clsx('h-16 flex items-center justify-center border-b border-stone-100', collapsed ? 'px-4' : 'px-5')}>
+        {collapsed ? (
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <img src="/brands/iso_saritur_branco.svg" alt="SGM" className="w-5 h-5" />
+          </div>
+        ) : (
+          <img src="/brands/logo_saritur_branco.svg" alt="Saritur" className="h-7" />
         )}
       </div>
 
@@ -89,32 +97,11 @@ export const Layout = () => {
         })}
       </nav>
 
-      {/* User Footer */}
-      <div className={clsx('border-t border-stone-100', collapsed ? 'p-2' : 'p-3')}>
-        <div className={clsx(
-          'flex items-center rounded-xl transition-colors',
-          collapsed ? 'justify-center p-2' : 'px-3 py-2.5 gap-3'
-        )}>
-          <div className="w-9 h-9 rounded-full bg-saritur-yellow flex items-center justify-center text-brown text-sm font-bold flex-shrink-0 shadow-sm">
-            {initials}
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden flex-1 min-w-0">
-              <p className="text-sm font-medium text-brown truncate">{user?.nome}</p>
-              <p className="text-xs text-brown/40 truncate">{user?.role}</p>
-            </div>
-          )}
+      {/* Sidebar footer — logo/versão somente */}
+      <div className={clsx('border-t border-stone-100 p-3', collapsed && 'p-2')}>
+        <div className={clsx('text-center', collapsed ? 'text-[9px]' : 'text-xs')}>
+          <span className="text-brown/20 font-medium">v1.0</span>
         </div>
-        <button
-          onClick={handleLogout}
-          className={clsx(
-            'flex items-center text-sm text-brown/40 hover:text-primary hover:bg-stone-50 transition-colors w-full rounded-xl mt-1',
-            collapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-2'
-          )}
-        >
-          <LogOut size={16} />
-          {!collapsed && <span>Sair do sistema</span>}
-        </button>
       </div>
     </>
   );
@@ -173,31 +160,44 @@ export const Layout = () => {
               <Menu size={20} />
             </button>
 
-            {/* Search */}
-            <div className="relative group hidden sm:block">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brown/30 transition-colors group-focus-within:text-primary" />
-              <input
-                type="text"
-                placeholder="Buscar metas, projetos..."
-                className="pl-9 pr-4 py-2 w-64 bg-stone-50/50 border border-transparent focus:border-primary/30 focus:bg-white rounded-xl text-sm text-brown placeholder-brown/30 outline-none transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(243,113,55,0.1)]"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="relative p-2 rounded-xl text-brown/50 hover:bg-saritur-yellow/20 hover:text-brown transition-colors">
+            <button className="relative p-2 rounded-xl text-brown/50 hover:bg-primary/10 hover:text-primary transition-colors">
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary border-2 border-white" />
             </button>
-            <Button
-              onClick={handleLogout}
-              size="sm"
-              variant="primary"
-              leftIcon={<LogOut size={14} />}
-              className="hidden sm:flex"
-            >
-              Sair
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-stone-50 transition-colors outline-none">
+                  <UserAvatar name={user?.nome || ''} imageUrl={user?.avatar} size="sm" />
+                  <span className="text-sm font-medium text-brown hidden sm:inline">{displayName}</span>
+                  <ChevronDown size={14} className="text-brown/40" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-3 py-2.5">
+                  <p className="text-sm font-bold text-brown">{user?.nome}</p>
+                  <p className="text-xs text-stone-400">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="opacity-50 cursor-default">
+                  <User size={16} />
+                  Editar Perfil
+                  <span className="ml-auto text-[10px] text-stone-400 font-medium">em breve</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
+                  <Settings size={16} />
+                  Configurações
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                  <LogOut size={16} />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -208,6 +208,7 @@ export const Layout = () => {
           </div>
         </div>
       </main>
+      <Toaster />
     </div>
   );
 };

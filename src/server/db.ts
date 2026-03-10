@@ -92,10 +92,10 @@ export async function initDb() {
         nome TEXT NOT NULL,
         "contribuicaoEsperadaCentavos" BIGINT NOT NULL,
         "pesoAutomatico" DOUBLE PRECISION NOT NULL,
-        "prazoInicio" DATE NOT NULL,
-        "prazoFim" DATE NOT NULL,
-        "responsavelPrincipal" TEXT NOT NULL REFERENCES users(id),
-        responsaveis JSONB NOT NULL,
+        "prazoInicio" DATE,
+        "prazoFim" DATE,
+        "responsavelPrincipal" TEXT REFERENCES users(id),
+        responsaveis JSONB DEFAULT '[]',
         status TEXT NOT NULL CHECK(status IN ('NAO_INICIADO','EM_ANDAMENTO','CONCLUIDO','CANCELADO')),
         "criadoPor" TEXT NOT NULL REFERENCES users(id),
         "criadoEm" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -198,6 +198,12 @@ export async function initDb() {
       ALTER TABLE metas DROP CONSTRAINT IF EXISTS metas_unidadeMeta_check;
       ALTER TABLE metas ADD CONSTRAINT metas_unidadeMeta_check
         CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE'));
+
+      -- Projetos: prazo e responsável agora são opcionais
+      ALTER TABLE projetos ALTER COLUMN "prazoInicio" DROP NOT NULL;
+      ALTER TABLE projetos ALTER COLUMN "prazoFim" DROP NOT NULL;
+      ALTER TABLE projetos ALTER COLUMN "responsavelPrincipal" DROP NOT NULL;
+      ALTER TABLE projetos ALTER COLUMN responsaveis SET DEFAULT '[]';
     `);
 
     await client.query('COMMIT');

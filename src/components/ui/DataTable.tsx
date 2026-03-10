@@ -162,7 +162,7 @@ export function DataTable<T>({
     return (
         <div className={cn("flex flex-col h-full", className)}>
             {(!hideSearch || actionButton) && (
-                <div className="flex flex-col md:flex-row gap-4 mb-6 shrink-0">
+                <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 shrink-0">
                     {!hideSearch && (
                         <SearchInput
                             value={searchValue}
@@ -171,7 +171,7 @@ export function DataTable<T>({
                         />
                     )}
                     {actionButton && (
-                        <div className="shrink-0 [&>button]:h-12 [&>button]:w-full md:[&>button]:w-auto">
+                        <div className="shrink-0 flex items-center gap-2">
                             {actionButton}
                         </div>
                     )}

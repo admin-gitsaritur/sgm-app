@@ -1,5 +1,7 @@
+import { type ButtonHTMLAttributes } from "react"
 import { LucideIcon, icons } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { Tooltip, TooltipTrigger, TooltipContent } from "./Tooltip"
 
 // ============================================================================
 // COMPONENTE ICON
@@ -40,9 +42,12 @@ export function Icon({ name, size = 18, className }: IconProps) {
 
 type ActionTheme = "indigo" | "rose" | "emerald" | "sky" | "orange" | "violet" | "stone"
 
-interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     icon: string
     theme?: ActionTheme
+    /** Tooltip label — exibido ao passar o mouse */
+    label?: string
+    /** @deprecated Use `label` instead */
     title?: string
 }
 
@@ -58,11 +63,12 @@ interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
  *   - violet: Gestão (roxo)
  *   - rose: Deletar (vermelho)
  *   - stone: Padrão/Mais opções (cinza)
- * @param title - Tooltip do botão
+ * @param label - Tooltip exibido ao hover
  */
 export function ActionButton({
     icon,
     theme = "stone",
+    label,
     title,
     className,
     ...props
@@ -77,19 +83,33 @@ export function ActionButton({
         stone: "hover:text-brown hover:bg-stone-100"      // Padrão/Mais
     }
 
-    return (
+    const tooltipText = label || title
+
+    const button = (
         <button
             className={cn(
-                "w-9 h-9 flex items-center justify-center rounded-xl text-stone-400 transition-all duration-200",
+                "w-9 h-9 flex items-center justify-center rounded-xl text-stone-400 transition-all duration-200 outline-none focus-visible:ring-0",
                 themeClasses[theme],
                 className
             )}
-            title={title}
             {...props}
         >
             <Icon name={icon} size={18} />
         </button>
     )
+
+    if (tooltipText) {
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    {button}
+                </TooltipTrigger>
+                <TooltipContent>{tooltipText}</TooltipContent>
+            </Tooltip>
+        )
+    }
+
+    return button
 }
 
 // ============================================================================

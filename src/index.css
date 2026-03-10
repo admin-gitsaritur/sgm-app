@@ -43,11 +43,7 @@ body {
   background: #9ca3af;
 }
 
-/* Focus ring */
-*:focus-visible {
-  outline: 2px solid #F37137;
-  outline-offset: 2px;
-}
+/* Focus: cada componente controla seu próprio ring via Tailwind */
 
 /* Soft shadow utility (usado nos cards do saritur-cx) */
 .soft-shadow {

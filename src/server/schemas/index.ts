@@ -25,10 +25,10 @@ export const createProjetoSchema = z.object({
     metaId: z.string().uuid('ID de meta inválido'),
     nome: z.string().min(3).max(200).trim(),
     contribuicaoEsperada: z.number().positive('Deve ser positivo').finite(),
-    prazoInicio: z.string().min(1, 'Obrigatório'),
-    prazoFim: z.string().min(1, 'Obrigatório'),
-    responsavelPrincipal: z.string().uuid('ID de responsável inválido'),
-    responsaveis: z.array(z.string().uuid()).min(1, 'Pelo menos 1 responsável'),
+    prazoInicio: z.string().optional().nullable(),
+    prazoFim: z.string().optional().nullable(),
+    responsavelPrincipal: z.string().uuid('ID de responsável inválido').optional().nullable(),
+    responsaveis: z.array(z.string().uuid()).optional().nullable(),
 });
 
 export const updateProjetoSchema = createProjetoSchema.partial().extend({

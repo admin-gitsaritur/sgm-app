@@ -3,8 +3,8 @@ import clsx from 'clsx';
 const statusColors: Record<string, string> = {
     ATIVA: 'bg-emerald-100 text-emerald-800',
     CONCLUIDA: 'bg-blue-100 text-blue-800',
-    CANCELADA: 'bg-gray-100 text-gray-600',
-    NAO_INICIADO: 'bg-gray-100 text-gray-600',
+    CANCELADA: 'bg-stone-100 text-stone-600',
+    NAO_INICIADO: 'bg-stone-100 text-stone-600',
     EM_ANDAMENTO: 'bg-amber-100 text-amber-800',
     CONCLUIDO: 'bg-emerald-100 text-emerald-800',
     CANCELADO: 'bg-gray-100 text-gray-600',

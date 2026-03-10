@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Metas } from './pages/Metas';
 import { Projetos } from './pages/Projetos';
 import { Indicadores } from './pages/Indicadores';
+import { Mapeamento } from './pages/Mapeamento';
 import { Usuarios } from './pages/Usuarios';
 import { Auditoria } from './pages/Auditoria';
 import { Responsaveis } from './pages/Responsaveis';
@@ -41,6 +42,7 @@ const AppRoutes = () => {
           <Route path="metas" element={<ProtectedRoute roles={['ADMIN']}><Metas /></ProtectedRoute>} />
           <Route path="projetos" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Projetos /></ProtectedRoute>} />
           <Route path="indicadores" element={<ProtectedRoute roles={['ADMIN', 'GESTOR', 'OPERADOR']}><Indicadores /></ProtectedRoute>} />
+          <Route path="mapeamento" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Mapeamento /></ProtectedRoute>} />
           <Route path="responsaveis" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Responsaveis /></ProtectedRoute>} />
           <Route path="relatorios" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Relatorios /></ProtectedRoute>} />
           <Route path="usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />

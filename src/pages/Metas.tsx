@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Label } from '../components/ui/Label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/Select';
@@ -10,10 +9,17 @@ import {
   DataTable, DataTableCellPrimary, DataTableStatusBadge, DataTableBadge,
   type Column,
 } from '../components/ui/DataTable';
-import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/Tooltip';
+import { ActionButton } from '../components/ui/ActionButton';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { PageHeader } from '../components/ui/PageHeader';
+import { FormField } from '../components/ui/FormField';
+import { CurrencyInput } from '../components/ui/CurrencyInput';
+import { IconBadge } from '../components/ui/IconBadge';
+import { CellText } from '../components/ui/CellText';
+import { toast } from '../components/ui/Toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { Plus, Pencil, Trash2, Gauge, Calendar, DollarSign, Percent, Hash } from 'lucide-react';
+import { Plus, Gauge, Calendar, DollarSign, Percent, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 
 // ── Constantes ────────────────────────────────────────────
@@ -25,8 +31,16 @@ const UNIDADE_LABELS: Record<string, string> = {
 };
 
 const PERIODICIDADE_LABELS: Record<string, string> = {
-  SEMANAL: 'Semanal', QUINZENAL: 'Quinzenal', MENSAL: 'Mensal',
+  MENSAL: 'Mensal',
   TRIMESTRAL: 'Trimestral', QUADRIMESTRAL: 'Quadrimestral', SEMESTRAL: 'Semestral',
+};
+
+/** Labels dos períodos para curva personalizada, conforme periodicidade */
+const PERIODICIDADE_PERIODOS: Record<string, string[]> = {
+  MENSAL: MESES,
+  TRIMESTRAL: ['1º Tri', '2º Tri', '3º Tri', '4º Tri'],
+  QUADRIMESTRAL: ['1º Quad', '2º Quad', '3º Quad'],
+  SEMESTRAL: ['1º Sem', '2º Sem'],
 };
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
@@ -53,8 +67,9 @@ export const Metas = () => {
   const [editingMeta, setEditingMeta] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const anoAtual = new Date().getFullYear();
 
@@ -87,16 +102,32 @@ export const Metas = () => {
     finally { setLoading(false); }
   };
 
-  // ── Filtered data (busca local) ──
+  // ── Filtered + sorted data (busca local) ──
   const filteredMetas = useMemo(() => {
-    if (!search.trim()) return metas;
-    const q = search.toLowerCase();
-    return metas.filter((m: any) =>
-      m.nome?.toLowerCase().includes(q) ||
-      m.ano?.toString().includes(q) ||
-      m.status?.toLowerCase().includes(q)
-    );
-  }, [metas, search]);
+    let list = metas;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((m: any) =>
+        m.nome?.toLowerCase().includes(q) ||
+        m.ano?.toString().includes(q) ||
+        m.status?.toLowerCase().includes(q)
+      );
+    }
+    if (sortField) {
+      list = [...list].sort((a: any, b: any) => {
+        const va = a[sortField] ?? '';
+        const vb = b[sortField] ?? '';
+        const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [metas, search, sortField, sortOrder]);
+
+  const handleSortChange = (field: string, order: 'asc' | 'desc') => {
+    setSortField(field);
+    setSortOrder(order);
+  };
 
   // ── DataTable Columns ──
   // O DataTable do saritur-cx usa um design system padronizado:
@@ -120,9 +151,7 @@ export const Metas = () => {
       cellVariant: 'none' as const,
       render: (_: unknown, row: any) => (
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Gauge className="w-4 h-4 text-primary" />
-          </div>
+          <IconBadge icon={<Gauge className="w-4 h-4" />} theme="primary" />
           <DataTableCellPrimary>
             {row.nome}
           </DataTableCellPrimary>
@@ -147,9 +176,9 @@ export const Metas = () => {
       hiddenOnMobile: true,
       cellVariant: 'none' as const,
       render: (_: unknown, row: any) => (
-        <span className="text-sm text-stone-500">
+        <CellText variant="muted">
           {row.periodoInicio ? format(new Date(row.periodoInicio), 'dd/MM/yy') : '—'} – {row.periodoFim ? format(new Date(row.periodoFim), 'dd/MM/yy') : '—'}
-        </span>
+        </CellText>
       ),
     },
     {
@@ -160,7 +189,7 @@ export const Metas = () => {
       cellVariant: 'none' as const,
       render: (val: unknown) => (
         <DataTableBadge color="gray">
-          {PERIODICIDADE_LABELS[val as string] || val}
+          {PERIODICIDADE_LABELS[val as string] || String(val)}
         </DataTableBadge>
       ),
     },
@@ -187,28 +216,18 @@ export const Metas = () => {
       cellVariant: 'none' as const,
       render: (_: unknown, row: any) => (
         <div className="inline-flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="h-8 w-8 rounded-lg text-stone-300 hover:text-primary hover:bg-primary/10 transition-colors inline-flex items-center justify-center"
-                onClick={(e) => { e.stopPropagation(); openEdit(row); }}
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Editar</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="h-8 w-8 rounded-lg text-stone-300 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex items-center justify-center"
-                onClick={(e) => { e.stopPropagation(); setDeleteTarget(row); }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Excluir</TooltipContent>
-          </Tooltip>
+          <ActionButton
+            icon="pencil"
+            theme="indigo"
+            title="Editar"
+            onClick={(e) => { e.stopPropagation(); openEdit(row); }}
+          />
+          <ActionButton
+            icon="trash-2"
+            theme="rose"
+            title="Excluir"
+            onClick={(e) => { e.stopPropagation(); setDeleteTarget(row); }}
+          />
         </div>
       ),
     },
@@ -226,7 +245,6 @@ export const Metas = () => {
       periodicidadeAtualizacao: 'MENSAL',
       tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill(''),
     });
-    setError('');
     setIsModalOpen(true);
   };
 
@@ -246,12 +264,11 @@ export const Metas = () => {
       tipoCurva: m.tipoCurva,
       curvaPersonalizada: curva,
     });
-    setError('');
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-    setSaving(true); setError('');
+    setSaving(true);
     try {
       const body: any = {
         nome: form.nome,
@@ -273,7 +290,8 @@ export const Metas = () => {
       }
       setIsModalOpen(false);
       fetchMetas();
-    } catch (err: any) { setError(err.message); }
+      toast.success({ title: 'Sucesso!', description: editingMeta ? 'Meta atualizada.' : 'Meta criada.' });
+    } catch (err: any) { toast.error({ title: 'Erro ao salvar', description: err.message }); }
     finally { setSaving(false); }
   };
 
@@ -283,7 +301,8 @@ export const Metas = () => {
       await api(`/metas/${deleteTarget.id}`, { method: 'DELETE' });
       setDeleteTarget(null);
       fetchMetas();
-    } catch (err: any) { alert(err.message); }
+      toast.success({ title: 'Meta excluída', description: 'A meta foi removida com sucesso.' });
+    } catch (err: any) { toast.error({ title: 'Erro ao excluir', description: err.message }); }
   };
 
   // ── Curva helpers ──
@@ -292,6 +311,15 @@ export const Metas = () => {
   const somaCurva = form.curvaPersonalizada.reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const valorMeta = parseFloat(form.valorMeta) || 0;
   const progressoCurva = valorMeta > 0 ? (somaCurva / valorMeta) * 100 : 0;
+  const periodos = PERIODICIDADE_PERIODOS[form.periodicidadeAtualizacao] || MESES;
+  const periodoLabel = form.periodicidadeAtualizacao === 'MENSAL' ? 'mês'
+    : form.periodicidadeAtualizacao === 'TRIMESTRAL' ? 'trimestre'
+    : form.periodicidadeAtualizacao === 'QUADRIMESTRAL' ? 'quadrimestre' : 'semestre';
+
+  const handlePeriodicidadeChange = (v: string) => {
+    const novos = PERIODICIDADE_PERIODOS[v] || MESES;
+    setForm({ ...form, periodicidadeAtualizacao: v, curvaPersonalizada: Array(novos.length).fill('') });
+  };
 
   // ── Render ──
 
@@ -299,10 +327,10 @@ export const Metas = () => {
     <div className="space-y-2">
 
       {/* ── Header ── */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-semibold text-brown tracking-tight">Gestão de Metas</h1>
-        <p className="text-brown/50 text-sm mt-1">Gerencie as metas estratégicas corporativas (Camada 1)</p>
-      </div>
+      <PageHeader
+        title="Gestão de Metas"
+        subtitle="Gerencie as metas estratégicas corporativas (Camada 1)"
+      />
 
       {/* ── DataTable ──
        * Componente padrão saritur-cx:
@@ -318,13 +346,16 @@ export const Metas = () => {
         columns={columns}
         loading={loading}
         rowKey="id"
+        sortField={sortField}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
         emptyMessage="Nenhuma meta cadastrada"
         emptyIcon={<Gauge className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
         searchPlaceholder="Buscar metas..."
         searchValue={search}
         onSearchChange={setSearch}
         actionButton={
-          <Button onClick={openCreate} leftIcon={<Plus size={18} />}>
+          <Button onClick={openCreate} leftIcon={<Plus size={18} />} size="lg">
             Nova Meta
           </Button>
         }
@@ -335,20 +366,26 @@ export const Metas = () => {
       />
 
       {/* ── Form Modal ── */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingMeta ? 'Editar Meta' : 'Nova Meta'} size="lg">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingMeta ? 'Editar Meta' : 'Nova Meta'}
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} isLoading={saving}>{editingMeta ? 'Atualizar' : 'Criar Meta'}</Button>
+          </>
+        }
+      >
         <div className="space-y-5">
-          {error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-700">{error}</div>
-          )}
 
-          <div className="space-y-1.5">
-            <Label>Nome da Meta</Label>
+          <FormField label="Nome da Meta">
             <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Receita Operacional 2025" leftIcon={<Gauge size={16} />} />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label>Unidade</Label>
+            <FormField label="Unidade">
               <Select value={form.unidadeMeta} onValueChange={v => setForm({ ...form, unidadeMeta: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -357,48 +394,47 @@ export const Metas = () => {
                   <SelectItem value="UNIDADE">Un (Unidade)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>{valorLabel}</Label>
-              <Input type="number" step={form.unidadeMeta === 'PERCENTUAL' ? '0.1' : form.unidadeMeta === 'UNIDADE' ? '1' : '0.01'}
-                value={form.valorMeta} onChange={e => setForm({ ...form, valorMeta: e.target.value })}
-                placeholder={form.unidadeMeta === 'PERCENTUAL' ? '95.0' : form.unidadeMeta === 'UNIDADE' ? '500' : '10000000.00'}
-                leftIcon={valorIcon} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Ano</Label>
+            </FormField>
+            <FormField label={valorLabel}>
+              {form.unidadeMeta === 'BRL' ? (
+                <CurrencyInput
+                  value={form.valorMeta}
+                  onChange={v => setForm({ ...form, valorMeta: v })}
+                />
+              ) : (
+                <Input type="number" step={form.unidadeMeta === 'PERCENTUAL' ? '0.1' : '1'}
+                  value={form.valorMeta} onChange={e => setForm({ ...form, valorMeta: e.target.value })}
+                  placeholder={form.unidadeMeta === 'PERCENTUAL' ? '95.0' : '500'}
+                  leftIcon={valorIcon} />
+              )}
+            </FormField>
+            <FormField label="Ano">
               <Input type="number" value={form.ano} onChange={e => handleAnoChange(e.target.value)} leftIcon={<Calendar size={16} />} />
-            </div>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Período Início</Label>
+            <FormField label="Período Início">
               <Input type="date" value={form.periodoInicio} onChange={e => setForm({ ...form, periodoInicio: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Período Fim</Label>
+            </FormField>
+            <FormField label="Período Fim">
               <Input type="date" value={form.periodoFim} onChange={e => setForm({ ...form, periodoFim: e.target.value })} />
-            </div>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Periodicidade de Alimentação</Label>
-              <Select value={form.periodicidadeAtualizacao} onValueChange={v => setForm({ ...form, periodicidadeAtualizacao: v })}>
+            <FormField label="Periodicidade de Alimentação">
+              <Select value={form.periodicidadeAtualizacao} onValueChange={handlePeriodicidadeChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SEMANAL">Semanal</SelectItem>
-                  <SelectItem value="QUINZENAL">Quinzenal</SelectItem>
                   <SelectItem value="MENSAL">Mensal</SelectItem>
                   <SelectItem value="TRIMESTRAL">Trimestral</SelectItem>
                   <SelectItem value="QUADRIMESTRAL">Quadrimestral</SelectItem>
                   <SelectItem value="SEMESTRAL">Semestral</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tipo de Curva</Label>
+            </FormField>
+            <FormField label="Tipo de Curva">
               <Select value={form.tipoCurva} onValueChange={v => setForm({ ...form, tipoCurva: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -406,38 +442,30 @@ export const Metas = () => {
                   <SelectItem value="PERSONALIZADA">Personalizada</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
           </div>
 
           {form.tipoCurva === 'PERSONALIZADA' && (
-            <div className="space-y-3 bg-stone-50 rounded-xl p-4 border border-stone-100">
-              <div className="flex items-center justify-between">
-                <Label>Curva Personalizada ({UNIDADE_LABELS[form.unidadeMeta] || 'R$'} por mês)</Label>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${Math.abs(progressoCurva - 100) < 0.01 ? 'bg-emerald-50 text-emerald-700' : progressoCurva > 100 ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
-                  }`}>
-                  {somaCurva.toLocaleString('pt-BR')} ({progressoCurva.toFixed(1)}%)
-                </span>
-              </div>
-              <div className="w-full bg-stone-200 rounded-full h-1.5">
-                <div className={`h-1.5 rounded-full transition-all duration-300 ${Math.abs(progressoCurva - 100) < 0.01 ? 'bg-emerald-500' : progressoCurva > 100 ? 'bg-rose-500' : 'bg-amber-500'
-                  }`} style={{ width: `${Math.min(progressoCurva, 100)}%` }} />
-              </div>
+           <div className="space-y-3 bg-stone-50 rounded-xl p-4 border border-stone-100">
+              <ProgressBar
+                value={progressoCurva}
+                color={Math.abs(progressoCurva - 100) < 0.01 ? 'bg-emerald-500' : progressoCurva > 100 ? 'bg-rose-500' : 'bg-amber-500'}
+                bgColor="bg-stone-200"
+                height="sm"
+                label={`Curva Personalizada (${UNIDADE_LABELS[form.unidadeMeta] || 'R$'} por ${periodoLabel})`}
+                valueLabel={`${somaCurva.toLocaleString('pt-BR')} (${progressoCurva.toFixed(1)}%)`}
+              />
               <div className="grid grid-cols-4 gap-2">
-                {MESES.map((mes, i) => (
+                {periodos.map((label, i) => (
                   <div key={i} className="space-y-1">
-                    <span className="text-[11px] font-medium text-brown/40 uppercase">{mes}</span>
-                    <Input type="number" step="0.01" size="sm" value={form.curvaPersonalizada[i]}
+                    <CellText variant="label">{label}</CellText>
+                    <Input type="number" step="0.01" size="sm" value={form.curvaPersonalizada[i] || ''}
                       onChange={e => { const c = [...form.curvaPersonalizada]; c[i] = e.target.value; setForm({ ...form, curvaPersonalizada: c }); }} />
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-stone-100">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} isLoading={saving}>{editingMeta ? 'Atualizar' : 'Criar Meta'}</Button>
-          </div>
         </div>
       </Modal>
 

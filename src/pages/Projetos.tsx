@@ -1,198 +1,289 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../components/ui/Select';
+import {
+  DataTable, DataTableCellPrimary, DataTableBadge,
+  type Column,
+} from '../components/ui/DataTable';
+import { ActionButton } from '../components/ui/ActionButton';
+import { PageHeader } from '../components/ui/PageHeader';
+import { FormField } from '../components/ui/FormField';
+import { IconBadge } from '../components/ui/IconBadge';
+import { CellText } from '../components/ui/CellText';
+import { toast } from '../components/ui/Toast';
 import { Modal } from '../components/Modal';
-import { Badge } from '../components/Badge';
-import { EmptyState } from '../components/EmptyState';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { TableSkeleton } from '../components/Skeleton';
-import { Plus, Edit2, Trash2, Briefcase, Filter } from 'lucide-react';
+import { Plus, Briefcase, Percent } from 'lucide-react';
+
+// ── Helpers ───────────────────────────────────────────────
+
+
+// ── Component ─────────────────────────────────────────────
 
 export const Projetos = () => {
-    const [projetos, setProjetos] = useState<any[]>([]);
-    const [metas, setMetas] = useState<any[]>([]);
-    const [usuarios, setUsuarios] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProjeto, setEditingProjeto] = useState<any>(null);
-    const [deleteTarget, setDeleteTarget] = useState<any>(null);
-    const [filterMetaId, setFilterMetaId] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
+  const [projetos, setProjetos] = useState<any[]>([]);
+  const [metas, setMetas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProjeto, setEditingProjeto] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [filterMetaId, setFilterMetaId] = useState('__ALL__');
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-    const [form, setForm] = useState({
-        metaId: '', nome: '', contribuicaoEsperada: '', prazoInicio: '', prazoFim: '',
-        responsavelPrincipal: '', responsaveis: [] as string[],
-    });
+  const [form, setForm] = useState({
+    metaId: '', nome: '', contribuicaoEsperada: '',
+  });
 
-    useEffect(() => { fetchData(); }, [filterMetaId]);
+  useEffect(() => { fetchData(); }, [filterMetaId]);
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [projRes, metaRes, userRes] = await Promise.all([
-                api(`/projetos${filterMetaId ? `?metaId=${filterMetaId}` : ''}`),
-                api('/metas'),
-                api('/usuarios'),
-            ]);
-            if (projRes.success) setProjetos(projRes.data);
-            if (metaRes.success) setMetas(metaRes.data);
-            if (userRes.success) setUsuarios(userRes.data);
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
-    };
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const metaParam = filterMetaId && filterMetaId !== '__ALL__' ? `?metaId=${filterMetaId}` : '';
+      const [projRes, metaRes] = await Promise.all([
+        api(`/projetos${metaParam}`),
+        api('/metas'),
+      ]);
+      if (projRes.success) setProjetos(projRes.data);
+      if (metaRes.success) setMetas(metaRes.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
 
-    const openCreate = () => {
-        setEditingProjeto(null);
-        setForm({ metaId: '', nome: '', contribuicaoEsperada: '', prazoInicio: '', prazoFim: '', responsavelPrincipal: '', responsaveis: [] });
-        setError('');
-        setIsModalOpen(true);
-    };
+  // ── Filtered + sorted data ──
+  const filteredProjetos = useMemo(() => {
+    let list = projetos;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((p: any) =>
+        p.nome?.toLowerCase().includes(q) ||
+        p.status?.toLowerCase().includes(q)
+      );
+    }
+    if (sortField) {
+      list = [...list].sort((a: any, b: any) => {
+        const va = a[sortField] ?? '';
+        const vb = b[sortField] ?? '';
+        const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [projetos, search, sortField, sortOrder]);
 
-    const openEdit = (p: any) => {
-        setEditingProjeto(p);
-        setForm({
-            metaId: p.metaId, nome: p.nome,
-            contribuicaoEsperada: (p.contribuicaoEsperadaCentavos / 100).toString(),
-            prazoInicio: p.prazoInicio?.slice(0, 10), prazoFim: p.prazoFim?.slice(0, 10),
-            responsavelPrincipal: p.responsavelPrincipal,
-            responsaveis: Array.isArray(p.responsaveis) ? p.responsaveis : [],
-        });
-        setError('');
-        setIsModalOpen(true);
-    };
+  const handleSortChange = (field: string, order: 'asc' | 'desc') => {
+    setSortField(field);
+    setSortOrder(order);
+  };
 
-    const handleSave = async () => {
-        setSaving(true);
-        setError('');
-        try {
-            const body = {
-                ...form,
-                contribuicaoEsperada: parseFloat(form.contribuicaoEsperada),
-                responsaveis: form.responsaveis.length > 0 ? form.responsaveis : [form.responsavelPrincipal],
-            };
-            if (editingProjeto) {
-                await api(`/projetos/${editingProjeto.id}`, { method: 'PUT', body: JSON.stringify(body) });
-            } else {
-                await api('/projetos', { method: 'POST', body: JSON.stringify(body) });
-            }
-            setIsModalOpen(false);
-            fetchData();
-        } catch (err: any) { setError(err.message); }
-        finally { setSaving(false); }
-    };
+  // ── Helpers ──
+  const getMetaNome = (id: string) => metas.find((m: any) => m.id === id)?.nome || id;
 
-    const handleDelete = async () => {
-        if (!deleteTarget) return;
-        try {
-            await api(`/projetos/${deleteTarget.id}`, { method: 'DELETE' });
-            setDeleteTarget(null);
-            fetchData();
-        } catch (err: any) { setError(err.message); }
-    };
-
-    const formatCurrency = (centavos: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
-    const getUserName = (id: string) => usuarios.find((u: any) => u.id === id)?.nome || id;
-    const getMetaNome = (id: string) => metas.find((m: any) => m.id === id)?.nome || id;
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-[#4E3205]">Projetos</h1>
-                    <p className="text-gray-500 mt-1">Gerencie os projetos vinculados às metas (Camada 2)</p>
-                </div>
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-[#F37137] text-white rounded-lg hover:bg-[#d95f27] transition-colors shadow-sm">
-                    <Plus size={20} /> <span>Novo Projeto</span>
-                </button>
-            </div>
-
-            {metas.length > 0 && (
-                <div className="flex items-center gap-2">
-                    <Filter size={16} className="text-gray-400" />
-                    <select value={filterMetaId} onChange={e => setFilterMetaId(e.target.value)}
-                        className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-[#F37137] focus:border-[#F37137]">
-                        <option value="">Todas as metas</option>
-                        {metas.map((m: any) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                    </select>
-                </div>
-            )}
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                {loading ? <TableSkeleton rows={5} cols={7} /> : projetos.length === 0 ? (
-                    <EmptyState icon={<Briefcase className="w-8 h-8 text-gray-400" />} title="Nenhum projeto encontrado"
-                        description="Crie um projeto vinculado a uma meta para começar."
-                        action={<button onClick={openCreate} className="px-4 py-2 bg-[#F37137] text-white rounded-lg text-sm hover:bg-[#d95f27]">Criar Projeto</button>} />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 border-b border-gray-200">
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Nome</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Meta</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Contribuição</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Peso</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Responsável</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Status</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205] text-right">Ações</th>
-                            </tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {projetos.map((p: any) => (
-                                    <tr key={p.id} className="hover:bg-[#F37137]/5 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-[#4E3205]">{p.nome}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{p.metaNome || getMetaNome(p.metaId)}</td>
-                                        <td className="px-6 py-4 text-sm font-medium">{formatCurrency(p.contribuicaoEsperadaCentavos)}</td>
-                                        <td className="px-6 py-4 text-sm">{(p.pesoAutomatico * 100).toFixed(1)}%</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{getUserName(p.responsavelPrincipal)}</td>
-                                        <td className="px-6 py-4"><Badge status={p.status} /></td>
-                                        <td className="px-6 py-4 text-right space-x-1">
-                                            <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-[#F37137] rounded-lg hover:bg-white transition-colors"><Edit2 size={16} /></button>
-                                            <button onClick={() => setDeleteTarget(p)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-white transition-colors"><Trash2 size={16} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProjeto ? 'Editar Projeto' : 'Novo Projeto'} size="lg">
-                <div className="space-y-4">
-                    {error && <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700 rounded">{error}</div>}
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Meta vinculada</label>
-                        <select value={form.metaId} onChange={e => setForm({ ...form, metaId: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]">
-                            <option value="">Selecione...</option>
-                            {metas.map((m: any) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                        </select>
-                    </div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Nome do Projeto</label>
-                        <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]" />
-                    </div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Contribuição Esperada (R$)</label>
-                        <input type="number" step="0.01" value={form.contribuicaoEsperada} onChange={e => setForm({ ...form, contribuicaoEsperada: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Prazo Início</label>
-                            <input type="date" value={form.prazoInicio} onChange={e => setForm({ ...form, prazoInicio: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]" /></div>
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Prazo Fim</label>
-                            <input type="date" value={form.prazoFim} onChange={e => setForm({ ...form, prazoFim: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]" /></div>
-                    </div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Responsável Principal</label>
-                        <select value={form.responsavelPrincipal} onChange={e => setForm({ ...form, responsavelPrincipal: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137] focus:border-[#F37137]">
-                            <option value="">Selecione...</option>
-                            {usuarios.map((u: any) => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                        <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-[#F37137] rounded-lg hover:bg-[#d95f27] disabled:opacity-50">
-                            {saving ? 'Salvando...' : 'Salvar'}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-                title="Excluir Projeto" message={`Deseja realmente excluir o projeto "${deleteTarget?.nome}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" />
+  // ── DataTable Columns ──
+  const columns: Column<any>[] = useMemo(() => [
+    {
+      key: 'nome',
+      header: 'Projeto',
+      cellVariant: 'none' as const,
+      render: (_: unknown, row: any) => (
+        <div className="flex items-center gap-3">
+          <IconBadge icon={<Briefcase className="w-4 h-4" />} theme="violet" />
+          <DataTableCellPrimary>
+            {row.nome}
+          </DataTableCellPrimary>
         </div>
-    );
+      ),
+    },
+    {
+      key: 'metaId',
+      header: 'Meta',
+      hiddenOnMobile: true,
+      render: (_: unknown, row: any) => (
+        <CellText variant="muted">{row.metaNome || getMetaNome(row.metaId)}</CellText>
+      ),
+      cellVariant: 'none' as const,
+    },
+    {
+      key: 'contribuicaoEsperadaCentavos',
+      header: 'Peso',
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <DataTableBadge color="gray">
+          {((val as number) / 100).toFixed(1)}%
+        </DataTableBadge>
+      ),
+    },
+    {
+      key: 'acoes',
+      header: 'Ações',
+      width: '100px',
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (_: unknown, row: any) => (
+        <div className="inline-flex items-center gap-1">
+          <ActionButton
+            icon="pencil"
+            theme="indigo"
+            title="Editar"
+            onClick={(e) => { e.stopPropagation(); openEdit(row); }}
+          />
+          <ActionButton
+            icon="trash-2"
+            theme="rose"
+            title="Excluir"
+            onClick={(e) => { e.stopPropagation(); setDeleteTarget(row); }}
+          />
+        </div>
+      ),
+    },
+  ], [metas]);
+
+  // ── CRUD handlers ──
+
+  const openCreate = () => {
+    setEditingProjeto(null);
+    setForm({ metaId: '', nome: '', contribuicaoEsperada: '' });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (p: any) => {
+    setEditingProjeto(p);
+    setForm({
+      metaId: p.metaId, nome: p.nome,
+      contribuicaoEsperada: (p.contribuicaoEsperadaCentavos / 100).toString(),
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const body = {
+        metaId: form.metaId,
+        nome: form.nome,
+        contribuicaoEsperada: parseFloat(form.contribuicaoEsperada),
+      };
+      if (editingProjeto) {
+        await api(`/projetos/${editingProjeto.id}`, { method: 'PUT', body: JSON.stringify(body) });
+      } else {
+        await api('/projetos', { method: 'POST', body: JSON.stringify(body) });
+      }
+      setIsModalOpen(false);
+      fetchData();
+      toast.success({ title: 'Sucesso!', description: editingProjeto ? 'Projeto atualizado.' : 'Projeto criado.' });
+    } catch (err: any) { toast.error({ title: 'Erro ao salvar', description: err.message }); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api(`/projetos/${deleteTarget.id}`, { method: 'DELETE' });
+      setDeleteTarget(null);
+      fetchData();
+      toast.success({ title: 'Projeto excluído', description: 'O projeto foi removido com sucesso.' });
+    } catch (err: any) { toast.error({ title: 'Erro ao excluir', description: err.message }); }
+  };
+
+  // ── Render ──
+
+  return (
+    <div className="space-y-2">
+
+      {/* ── Header ── */}
+      <PageHeader
+        title="Projetos"
+        subtitle="Gerencie os projetos vinculados às metas (Camada 2)"
+      />
+
+      {/* ── DataTable ── */}
+      <DataTable
+        data={filteredProjetos}
+        columns={columns}
+        loading={loading}
+        rowKey="id"
+        sortField={sortField}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
+        emptyMessage="Nenhum projeto encontrado"
+        emptyIcon={<Briefcase className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+        searchPlaceholder="Buscar projetos..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        actionButton={
+          <div className="flex items-center gap-2">
+            {metas.length > 0 && (
+              <Select value={filterMetaId} onValueChange={setFilterMetaId}>
+                <SelectTrigger className="w-48 h-12">
+                  <SelectValue placeholder="Filtrar por meta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__ALL__">Todas as metas</SelectItem>
+                  {metas.map((m: any) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button onClick={openCreate} leftIcon={<Plus size={18} />} size="lg">
+              Novo Projeto
+            </Button>
+          </div>
+        }
+        labels={{
+          showingPrefix: 'Mostrando',
+          showingResults: 'projetos',
+        }}
+      />
+
+      {/* ── Form Modal ── */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleSave}
+        title={editingProjeto ? 'Editar Projeto' : 'Novo Projeto'}
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} isLoading={saving}>{editingProjeto ? 'Atualizar' : 'Criar Projeto'}</Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+
+          <FormField label="Meta vinculada">
+            <Select value={form.metaId} onValueChange={v => setForm({ ...form, metaId: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                {metas.map((m: any) => (
+                  <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <FormField label="Nome do Projeto">
+            <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Expansão Líder Metropolitano" leftIcon={<Briefcase size={16} />} />
+          </FormField>
+
+          <FormField label="Peso na Meta (%)">
+            <Input type="number" step="0.1" value={form.contribuicaoEsperada} onChange={e => setForm({ ...form, contribuicaoEsperada: e.target.value })} placeholder="30.0" leftIcon={<Percent size={16} />} />
+          </FormField>
+
+        </div>
+      </Modal>
+
+      <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
+        title="Excluir Projeto" message={`Deseja excluir "${deleteTarget?.nome}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" />
+    </div>
+  );
 };

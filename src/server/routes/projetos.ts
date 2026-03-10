@@ -79,10 +79,15 @@ projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoS
   try {
     const metaResult = await query('SELECT * FROM metas WHERE id = $1 AND "deletedAt" IS NULL', [metaId]);
     if (metaResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
+    const meta = metaResult.rows[0] as Meta;
 
     const contribuicaoCentavos = Math.round(contribuicaoEsperada * 100);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
+
+    // Se prazo não foi informado, usa o da meta
+    const pInicio = prazoInicio || meta.periodoInicio || null;
+    const pFim = prazoFim || meta.periodoFim || null;
 
     const client = await pool.connect();
     try {
@@ -90,7 +95,7 @@ projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoS
       await client.query(`
         INSERT INTO projetos (id, "metaId", nome, "contribuicaoEsperadaCentavos", "pesoAutomatico", "prazoInicio", "prazoFim", "responsavelPrincipal", responsaveis, status, "criadoPor", "criadoEm", "atualizadoEm")
         VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, $12)
-      `, [id, metaId, nome, contribuicaoCentavos, prazoInicio, prazoFim, responsavelPrincipal, JSON.stringify(responsaveis), 'NAO_INICIADO', req.user!.id, now, now]);
+      `, [id, metaId, nome, contribuicaoCentavos, pInicio, pFim, responsavelPrincipal || null, JSON.stringify(responsaveis || []), 'NAO_INICIADO', req.user!.id, now, now]);
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK');
@@ -98,7 +103,6 @@ projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoS
     } finally {
       client.release();
     }
-
     await recalcularPesos(metaId);
     await logAudit(req.user!.id, 'CREATE', 'Projeto', id, null, req.body, req.ip, req.headers['user-agent']);
 
@@ -125,8 +129,9 @@ projetosRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateProjet
       "responsavelPrincipal" = $5, responsaveis = $6, status = $7, "atualizadoEm" = $8 WHERE id = $9
     `, [
       nome || projeto.nome, contribuicaoCentavos,
-      prazoInicio || projeto.prazoInicio, prazoFim || projeto.prazoFim,
-      responsavelPrincipal || projeto.responsavelPrincipal,
+      prazoInicio !== undefined ? prazoInicio : projeto.prazoInicio,
+      prazoFim !== undefined ? prazoFim : projeto.prazoFim,
+      responsavelPrincipal !== undefined ? responsavelPrincipal : projeto.responsavelPrincipal,
       responsaveis ? JSON.stringify(responsaveis) : projeto.responsaveis,
       status || projeto.status, now, projeto.id,
     ]);

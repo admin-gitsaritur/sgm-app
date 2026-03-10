@@ -1,217 +1,582 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../components/ui/Select';
+import {
+  DataTable, DataTableCellPrimary, DataTableStatusBadge, DataTableBadge,
+  type Column,
+} from '../components/ui/DataTable';
+import { ActionButton } from '../components/ui/ActionButton';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { PageHeader } from '../components/ui/PageHeader';
+import { FormField } from '../components/ui/FormField';
+import { IconBadge } from '../components/ui/IconBadge';
+import { CurrencyInput } from '../components/ui/CurrencyInput';
+import { CellText } from '../components/ui/CellText';
+import { toast } from '../components/ui/Toast';
 import { Modal } from '../components/Modal';
-import { Badge } from '../components/Badge';
-import { EmptyState } from '../components/EmptyState';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { TableSkeleton } from '../components/Skeleton';
-import { Plus, Edit2, Trash2, BarChart2, RefreshCw, Filter } from 'lucide-react';
+import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw } from 'lucide-react';
+
+// ── Constantes ────────────────────────────────────────────
+
+const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
+  ATUALIZADO: 'success', PENDENTE: 'warning', ATRASADO: 'danger',
+};
+
+const UNIDADE_LABELS: Record<string, string> = {
+  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un',
+};
+
+const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const MESES_FULL = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+const PERIODICIDADE_PERIODOS: Record<string, string[]> = {
+  MENSAL: MESES,
+  TRIMESTRAL: ['1º Tri', '2º Tri', '3º Tri', '4º Tri'],
+  QUADRIMESTRAL: ['1º Quad', '2º Quad', '3º Quad'],
+  SEMESTRAL: ['1º Sem', '2º Sem'],
+};
+
+/** Labels completos com ano para o select de período de referência */
+const getPeriodosComAno = (freq: string): string[] => {
+  const ano = new Date().getFullYear();
+  if (freq === 'MENSAL') return MESES_FULL.map(m => `${m}/${ano}`);
+  if (freq === 'TRIMESTRAL') return ['1º Trimestre', '2º Trimestre', '3º Trimestre', '4º Trimestre'].map(t => `${t}/${ano}`);
+  if (freq === 'QUADRIMESTRAL') return ['1º Quadrimestre', '2º Quadrimestre', '3º Quadrimestre'].map(t => `${t}/${ano}`);
+  if (freq === 'SEMESTRAL') return ['1º Semestre', '2º Semestre'].map(t => `${t}/${ano}`);
+  return MESES_FULL.map(m => `${m}/${ano}`);
+};
+
+// ── Helpers ───────────────────────────────────────────────
+
+const formatCurrency = (centavos: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
+
+const getPercent = (ind: any) =>
+  ind.metaIndicadorCentavos > 0
+    ? ((ind.realizadoCentavos / ind.metaIndicadorCentavos) * 100).toFixed(1)
+    : '0.0';
+
+// ── Component ─────────────────────────────────────────────
 
 export const Indicadores = () => {
-    const [indicadores, setIndicadores] = useState<any[]>([]);
-    const [projetos, setProjetos] = useState<any[]>([]);
-    const [usuarios, setUsuarios] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-    const [editingIndicador, setEditingIndicador] = useState<any>(null);
-    const [updateTarget, setUpdateTarget] = useState<any>(null);
-    const [deleteTarget, setDeleteTarget] = useState<any>(null);
-    const [filterProjetoId, setFilterProjetoId] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [updateValue, setUpdateValue] = useState('');
+  const [indicadores, setIndicadores] = useState<any[]>([]);
+  const [projetos, setProjetos] = useState<any[]>([]);
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [editingIndicador, setEditingIndicador] = useState<any>(null);
+  const [updateTarget, setUpdateTarget] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [filterProjetoId, setFilterProjetoId] = useState('__ALL__');
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [updateValue, setUpdateValue] = useState('');
+  const [updatePeriodo, setUpdatePeriodo] = useState('');
+  const [sortField, setSortField] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-    const [form, setForm] = useState({
-        projetoId: '', nome: '', metaIndicador: '', unidade: '', peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '',
+  const [form, setForm] = useState({
+    projetoId: '', nome: '', metaIndicador: '', unidade: 'BRL',
+    peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '',
+    tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') as string[],
+  });
+
+  useEffect(() => { fetchData(); }, [filterProjetoId]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const filterParam = filterProjetoId && filterProjetoId !== '__ALL__'
+        ? `?projetoId=${filterProjetoId}` : '';
+      const [indRes, projRes, userRes] = await Promise.all([
+        api(`/indicadores${filterParam}`),
+        api('/projetos'),
+        api('/usuarios'),
+      ]);
+      if (indRes.success) setIndicadores(indRes.data);
+      if (projRes.success) setProjetos(projRes.data);
+      if (userRes.success) setUsuarios(userRes.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
+  // ── Filtered + sorted data ──
+  const filteredIndicadores = useMemo(() => {
+    let list = indicadores;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((ind: any) =>
+        ind.nome?.toLowerCase().includes(q) ||
+        ind.projetoNome?.toLowerCase().includes(q) ||
+        ind.statusAtualizacao?.toLowerCase().includes(q)
+      );
+    }
+    if (sortField) {
+      list = [...list].sort((a: any, b: any) => {
+        const va = a[sortField] ?? '';
+        const vb = b[sortField] ?? '';
+        const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [indicadores, search, sortField, sortOrder]);
+
+  const handleSortChange = (field: string, order: 'asc' | 'desc') => {
+    setSortField(field);
+    setSortOrder(order);
+  };
+
+  // ── Helpers ──
+  const getUserName = (id: string) => usuarios.find((u: any) => u.id === id)?.nome || id;
+
+  // ── CRUD handlers ──
+  const openCreate = () => {
+    setEditingIndicador(null);
+    setForm({ projetoId: '', nome: '', metaIndicador: '', unidade: 'BRL', peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '', tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (ind: any) => {
+    setEditingIndicador(ind);
+    setForm({
+      projetoId: ind.projetoId, nome: ind.nome,
+      metaIndicador: (ind.metaIndicadorCentavos / 100).toString(),
+      unidade: ind.unidade || 'BRL', peso: ind.peso.toString(),
+      frequenciaAtualizacao: ind.frequenciaAtualizacao, responsavel: ind.responsavel,
+      tipoCurva: ind.tipoCurva || 'LINEAR',
+      curvaPersonalizada: ind.curvaPersonalizada || Array(PERIODICIDADE_PERIODOS[ind.frequenciaAtualizacao]?.length || 12).fill(''),
     });
+    setIsModalOpen(true);
+  };
 
-    useEffect(() => { fetchData(); }, [filterProjetoId]);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const body = { ...form, metaIndicador: parseFloat(form.metaIndicador), peso: parseFloat(form.peso) };
+      if (editingIndicador) {
+        await api(`/indicadores/${editingIndicador.id}`, { method: 'PUT', body: JSON.stringify(body) });
+        toast.success({ title: 'Indicador atualizado!' });
+      } else {
+        await api('/indicadores', { method: 'POST', body: JSON.stringify(body) });
+        toast.success({ title: 'Indicador criado!' });
+      }
+      setIsModalOpen(false); fetchData();
+    } catch (err: any) { toast.error({ title: err.message || 'Erro ao salvar' }); }
+    finally { setSaving(false); }
+  };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [indRes, projRes, userRes] = await Promise.all([
-                api(`/indicadores${filterProjetoId ? `?projetoId=${filterProjetoId}` : ''}`),
-                api('/projetos'),
-                api('/usuarios'),
-            ]);
-            if (indRes.success) setIndicadores(indRes.data);
-            if (projRes.success) setProjetos(projRes.data);
-            if (userRes.success) setUsuarios(userRes.data);
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
-    };
+  const handleUpdate = async () => {
+    if (!updateTarget) return;
+    setSaving(true);
+    try {
+      await api(`/indicadores/${updateTarget.id}/atualizar`, {
+        method: 'POST', body: JSON.stringify({ realizado: parseFloat(updateValue) }),
+      });
+      toast.success({ title: 'Realizado atualizado!' });
+      setIsUpdateModalOpen(false); setUpdateTarget(null); fetchData();
+    } catch (err: any) { toast.error({ title: err.message || 'Erro ao atualizar' }); }
+    finally { setSaving(false); }
+  };
 
-    const openCreate = () => {
-        setEditingIndicador(null);
-        setForm({ projetoId: '', nome: '', metaIndicador: '', unidade: '', peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '' });
-        setError('');
-        setIsModalOpen(true);
-    };
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api(`/indicadores/${deleteTarget.id}`, { method: 'DELETE' });
+      toast.success({ title: 'Indicador excluído!' });
+      setDeleteTarget(null); fetchData();
+    } catch (err: any) { toast.error({ title: err.message || 'Erro ao excluir' }); }
+  };
 
-    const openEdit = (ind: any) => {
-        setEditingIndicador(ind);
-        setForm({
-            projetoId: ind.projetoId, nome: ind.nome,
-            metaIndicador: (ind.metaIndicadorCentavos / 100).toString(),
-            unidade: ind.unidade, peso: ind.peso.toString(),
-            frequenciaAtualizacao: ind.frequenciaAtualizacao, responsavel: ind.responsavel,
-        });
-        setError('');
-        setIsModalOpen(true);
-    };
-
-    const handleSave = async () => {
-        setSaving(true); setError('');
-        try {
-            const body = { ...form, metaIndicador: parseFloat(form.metaIndicador), peso: parseFloat(form.peso) };
-            if (editingIndicador) {
-                await api(`/indicadores/${editingIndicador.id}`, { method: 'PUT', body: JSON.stringify(body) });
-            } else {
-                await api('/indicadores', { method: 'POST', body: JSON.stringify(body) });
-            }
-            setIsModalOpen(false); fetchData();
-        } catch (err: any) { setError(err.message); }
-        finally { setSaving(false); }
-    };
-
-    const handleUpdate = async () => {
-        if (!updateTarget) return;
-        setSaving(true);
-        try {
-            await api(`/indicadores/${updateTarget.id}/atualizar`, { method: 'POST', body: JSON.stringify({ realizado: parseFloat(updateValue) }) });
-            setIsUpdateModalOpen(false); setUpdateTarget(null); fetchData();
-        } catch (err: any) { setError(err.message); }
-        finally { setSaving(false); }
-    };
-
-    const handleDelete = async () => {
-        if (!deleteTarget) return;
-        try { await api(`/indicadores/${deleteTarget.id}`, { method: 'DELETE' }); setDeleteTarget(null); fetchData(); }
-        catch (err: any) { setError(err.message); }
-    };
-
-    const formatCurrency = (centavos: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
-    const getUserName = (id: string) => usuarios.find((u: any) => u.id === id)?.nome || id;
-    const getPercent = (ind: any) => ind.metaIndicadorCentavos > 0 ? ((ind.realizadoCentavos / ind.metaIndicadorCentavos) * 100).toFixed(1) : '0.0';
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-[#4E3205]">Indicadores</h1>
-                    <p className="text-gray-500 mt-1">Acompanhe e atualize os indicadores de performance (Camada 3)</p>
-                </div>
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-[#F37137] text-white rounded-lg hover:bg-[#d95f27] transition-colors shadow-sm">
-                    <Plus size={20} /> <span>Novo Indicador</span>
-                </button>
-            </div>
-
-            {projetos.length > 0 && (
-                <div className="flex items-center gap-2">
-                    <Filter size={16} className="text-gray-400" />
-                    <select value={filterProjetoId} onChange={e => setFilterProjetoId(e.target.value)}
-                        className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-[#F37137] focus:border-[#F37137]">
-                        <option value="">Todos os projetos</option>
-                        {projetos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    </select>
-                </div>
-            )}
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                {loading ? <TableSkeleton rows={5} cols={8} /> : indicadores.length === 0 ? (
-                    <EmptyState icon={<BarChart2 className="w-8 h-8 text-gray-400" />} title="Nenhum indicador encontrado"
-                        description="Crie indicadores vinculados a projetos para acompanhar a performance."
-                        action={<button onClick={openCreate} className="px-4 py-2 bg-[#F37137] text-white rounded-lg text-sm">Criar Indicador</button>} />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 border-b border-gray-200">
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Nome</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Projeto</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Meta</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Realizado</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">% Atingido</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Peso</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Status</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205] text-right">Ações</th>
-                            </tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {indicadores.map((ind: any) => (
-                                    <tr key={ind.id} className="hover:bg-[#F37137]/5 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-[#4E3205]">{ind.nome}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{ind.projetoNome || ''}</td>
-                                        <td className="px-6 py-4 text-sm">{formatCurrency(ind.metaIndicadorCentavos)}</td>
-                                        <td className="px-6 py-4 text-sm">{formatCurrency(ind.realizadoCentavos)}</td>
-                                        <td className="px-6 py-4 text-sm font-medium">{getPercent(ind)}%</td>
-                                        <td className="px-6 py-4 text-sm">{(ind.peso * 100).toFixed(0)}%</td>
-                                        <td className="px-6 py-4"><Badge status={ind.statusAtualizacao} /></td>
-                                        <td className="px-6 py-4 text-right space-x-1">
-                                            <button onClick={() => { setUpdateTarget(ind); setUpdateValue((ind.realizadoCentavos / 100).toString()); setIsUpdateModalOpen(true); }}
-                                                className="p-2 text-gray-400 hover:text-emerald-500 rounded-lg hover:bg-white transition-colors" title="Atualizar Realizado"><RefreshCw size={16} /></button>
-                                            <button onClick={() => openEdit(ind)} className="p-2 text-gray-400 hover:text-[#F37137] rounded-lg hover:bg-white transition-colors"><Edit2 size={16} /></button>
-                                            <button onClick={() => setDeleteTarget(ind)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-white transition-colors"><Trash2 size={16} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingIndicador ? 'Editar Indicador' : 'Novo Indicador'} size="lg">
-                <div className="space-y-4">
-                    {error && <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700 rounded">{error}</div>}
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Projeto</label>
-                        <select value={form.projetoId} onChange={e => setForm({ ...form, projetoId: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                            <option value="">Selecione...</option>
-                            {projetos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                        </select></div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Nome</label>
-                        <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Meta do Indicador (R$)</label>
-                            <input type="number" step="0.01" value={form.metaIndicador} onChange={e => setForm({ ...form, metaIndicador: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Unidade</label>
-                            <input value={form.unidade} onChange={e => setForm({ ...form, unidade: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="R$, %, unidades..." /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Peso (0 a 1)</label>
-                            <input type="number" step="0.01" min="0" max="1" value={form.peso} onChange={e => setForm({ ...form, peso: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Frequência</label>
-                            <select value={form.frequenciaAtualizacao} onChange={e => setForm({ ...form, frequenciaAtualizacao: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                                <option value="MENSAL">Mensal</option><option value="QUINZENAL">Quinzenal</option><option value="SEMANAL">Semanal</option>
-                            </select></div>
-                    </div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Responsável</label>
-                        <select value={form.responsavel} onChange={e => setForm({ ...form, responsavel: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                            <option value="">Selecione...</option>
-                            {usuarios.map((u: any) => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                        </select></div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                        <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-[#F37137] rounded-lg hover:bg-[#d95f27] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
-                    </div>
-                </div>
-            </Modal>
-
-            <Modal isOpen={isUpdateModalOpen} onClose={() => setIsUpdateModalOpen(false)} title="Atualizar Realizado" size="sm">
-                <div className="space-y-4">
-                    <p className="text-sm text-gray-600">Indicador: <strong>{updateTarget?.nome}</strong></p>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Novo valor realizado (R$)</label>
-                        <input type="number" step="0.01" value={updateValue} onChange={e => setUpdateValue(e.target.value)}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-[#F37137]" /></div>
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                        <button onClick={() => setIsUpdateModalOpen(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                        <button onClick={handleUpdate} disabled={saving} className="px-4 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50">{saving ? 'Atualizando...' : 'Atualizar'}</button>
-                    </div>
-                </div>
-            </Modal>
-
-            <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-                title="Excluir Indicador" message={`Deseja excluir "${deleteTarget?.nome}"?`} confirmLabel="Excluir" />
+  // ── DataTable Columns ──
+  const columns: Column<any>[] = useMemo(() => [
+    {
+      key: 'nome',
+      header: 'Indicador',
+      cellVariant: 'none' as const,
+      render: (_: unknown, row: any) => (
+        <div className="flex items-center gap-3">
+          <IconBadge icon={<BarChart2 className="w-4 h-4" />} theme="emerald" />
+          <div>
+            <DataTableCellPrimary>{row.nome}</DataTableCellPrimary>
+            <CellText variant="muted" className="text-xs">{row.projetoNome || '—'}</CellText>
+          </div>
         </div>
-    );
+      ),
+    },
+    {
+      key: 'metaIndicadorCentavos',
+      header: 'Meta',
+      hiddenOnMobile: true,
+      align: 'right' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <CellText variant="muted">{formatCurrency(val as number)}</CellText>
+      ),
+    },
+    {
+      key: 'realizadoCentavos',
+      header: 'Realizado',
+      hiddenOnMobile: true,
+      align: 'right' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <CellText className="font-semibold">{formatCurrency(val as number)}</CellText>
+      ),
+    },
+    {
+      key: 'percentual',
+      header: '% Atingido',
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (_: unknown, row: any) => {
+        const pct = parseFloat(getPercent(row));
+        return (
+          <div className="flex flex-col items-center gap-1 min-w-[80px]">
+            <span className="text-xs font-bold text-brown">{pct}%</span>
+            <ProgressBar value={pct} height="sm" />
+          </div>
+        );
+      },
+    },
+    {
+      key: 'peso',
+      header: 'Peso',
+      hiddenOnMobile: true,
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <DataTableBadge color="gray">
+          {((val as number) * 100).toFixed(0)}%
+        </DataTableBadge>
+      ),
+    },
+    {
+      key: 'responsavel',
+      header: 'Responsável',
+      hiddenOnMobile: true,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <CellText variant="muted">{getUserName(val as string)}</CellText>
+      ),
+    },
+    {
+      key: 'statusAtualizacao',
+      header: 'Status',
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => {
+        const s = val as string;
+        return (
+          <DataTableStatusBadge
+            status={s}
+            variant={STATUS_VARIANT[s] || 'default'}
+          />
+        );
+      },
+    },
+    {
+      key: 'acoes',
+      header: 'Ações',
+      width: '120px',
+      align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (_: unknown, row: any) => (
+        <div className="inline-flex items-center gap-1">
+          <ActionButton
+            icon="refresh-cw"
+            theme="emerald"
+            title="Atualizar Realizado"
+            onClick={(e) => {
+              e.stopPropagation();
+              setUpdateTarget(row);
+              setUpdateValue((row.realizadoCentavos / 100).toString());
+              // Calcular M-1: período anterior ao atual
+              const freq = row.frequenciaAtualizacao || 'MENSAL';
+              const periodos = PERIODICIDADE_PERIODOS[freq] || MESES;
+              const now = new Date();
+              const mesAtual = now.getMonth(); // 0-indexed
+              let periodoIdx = 0;
+              if (freq === 'MENSAL') {
+                periodoIdx = Math.max(0, mesAtual - 1); // M-1
+              } else if (freq === 'TRIMESTRAL') {
+                periodoIdx = Math.max(0, Math.floor(mesAtual / 3) - 1);
+              } else if (freq === 'QUADRIMESTRAL') {
+                periodoIdx = Math.max(0, Math.floor(mesAtual / 4) - 1);
+              } else if (freq === 'SEMESTRAL') {
+                periodoIdx = Math.max(0, Math.floor(mesAtual / 6) - 1);
+              }
+              setUpdatePeriodo(periodoIdx.toString());
+              setIsUpdateModalOpen(true);
+            }}
+          />
+          <ActionButton
+            icon="pencil"
+            theme="indigo"
+            title="Editar"
+            onClick={(e) => { e.stopPropagation(); openEdit(row); }}
+          />
+          <ActionButton
+            icon="trash-2"
+            theme="rose"
+            title="Excluir"
+            onClick={(e) => { e.stopPropagation(); setDeleteTarget(row); }}
+          />
+        </div>
+      ),
+    },
+  ], [usuarios]);
+
+  // ── Render ──
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Indicadores"
+        subtitle="Acompanhe e atualize os indicadores de performance (Camada 3)"
+      />
+
+      {/* ── DataTable ── */}
+      <DataTable
+        data={filteredIndicadores}
+        columns={columns}
+        loading={loading}
+        rowKey="id"
+        sortField={sortField}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
+        emptyMessage="Nenhum indicador encontrado"
+        emptyIcon={<BarChart2 className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+        searchPlaceholder="Buscar indicadores..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        actionButton={
+          <div className="flex items-center gap-2">
+            {projetos.length > 0 && (
+              <Select value={filterProjetoId} onValueChange={setFilterProjetoId}>
+                <SelectTrigger className="w-52 h-12">
+                  <SelectValue placeholder="Filtrar por projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__ALL__">Todos os projetos</SelectItem>
+                  {projetos.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button onClick={openCreate} leftIcon={<Plus size={18} />} size="lg">
+              Novo Indicador
+            </Button>
+          </div>
+        }
+        labels={{
+          showingPrefix: 'Mostrando',
+          showingResults: 'indicadores',
+        }}
+      />
+
+      {/* ── Form Modal (Criar / Editar) ── */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleSave}
+        title={editingIndicador ? 'Editar Indicador' : 'Novo Indicador'}
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} isLoading={saving}>{editingIndicador ? 'Atualizar' : 'Criar Indicador'}</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Projeto">
+            <Select value={form.projetoId} onValueChange={v => setForm({ ...form, projetoId: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o projeto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {projetos.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <FormField label="Nome do Indicador">
+            <Input
+              value={form.nome}
+              onChange={e => setForm({ ...form, nome: e.target.value })}
+              placeholder="Ex: Receita Mensal, NPS, Ticket Médio"
+              leftIcon={<BarChart2 size={16} />}
+            />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Meta do Indicador">
+              <CurrencyInput
+                value={form.metaIndicador}
+                onChange={v => setForm({ ...form, metaIndicador: v })}
+              />
+            </FormField>
+            <FormField label="Unidade">
+              <Select value={form.unidade} onValueChange={v => setForm({ ...form, unidade: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">R$ (Reais)</SelectItem>
+                  <SelectItem value="PERCENTUAL">% (Percentual)</SelectItem>
+                  <SelectItem value="UNIDADE">Un (Unidade)</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Peso (0 a 1)">
+              <Input
+                type="number" step="0.01" min="0" max="1"
+                value={form.peso}
+                onChange={e => setForm({ ...form, peso: e.target.value })}
+                placeholder="0.30"
+                leftIcon={<Percent size={16} />}
+              />
+            </FormField>
+            <FormField label="Frequência">
+              <Select value={form.frequenciaAtualizacao} onValueChange={v => {
+                const novos = PERIODICIDADE_PERIODOS[v] || MESES;
+                setForm({ ...form, frequenciaAtualizacao: v, curvaPersonalizada: Array(novos.length).fill('') });
+              }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MENSAL">Mensal</SelectItem>
+                  <SelectItem value="TRIMESTRAL">Trimestral</SelectItem>
+                  <SelectItem value="QUADRIMESTRAL">Quadrimestral</SelectItem>
+                  <SelectItem value="SEMESTRAL">Semestral</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Tipo de Curva">
+              <Select value={form.tipoCurva} onValueChange={v => setForm({ ...form, tipoCurva: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LINEAR">Linear</SelectItem>
+                  <SelectItem value="PERSONALIZADA">Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+
+          {form.tipoCurva === 'PERSONALIZADA' && (() => {
+            const periodos = PERIODICIDADE_PERIODOS[form.frequenciaAtualizacao] || MESES;
+            const somaCurva = form.curvaPersonalizada.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+            const metaVal = parseFloat(form.metaIndicador) || 0;
+            const progresso = metaVal > 0 ? (somaCurva / metaVal) * 100 : 0;
+            const periodoLabel = form.frequenciaAtualizacao === 'MENSAL' ? 'mês'
+              : form.frequenciaAtualizacao === 'TRIMESTRAL' ? 'trimestre'
+              : form.frequenciaAtualizacao === 'QUADRIMESTRAL' ? 'quadrimestre' : 'semestre';
+            return (
+              <div className="space-y-3 bg-stone-50 rounded-xl p-4 border border-stone-100">
+                <ProgressBar
+                  value={progresso}
+                  color={Math.abs(progresso - 100) < 0.01 ? 'bg-emerald-500' : progresso > 100 ? 'bg-rose-500' : 'bg-amber-500'}
+                  bgColor="bg-stone-200"
+                  height="sm"
+                  label={`Curva Personalizada (${UNIDADE_LABELS[form.unidade] || 'R$'} por ${periodoLabel})`}
+                  valueLabel={`${somaCurva.toLocaleString('pt-BR')} (${progresso.toFixed(1)}%)`}
+                />
+                <div className="grid grid-cols-4 gap-2">
+                  {periodos.map((label, i) => (
+                    <div key={i} className="space-y-1">
+                      <CellText variant="label">{label}</CellText>
+                      <Input type="number" step="0.01" size="sm" value={form.curvaPersonalizada[i] || ''}
+                        onChange={e => { const c = [...form.curvaPersonalizada]; c[i] = e.target.value; setForm({ ...form, curvaPersonalizada: c }); }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <FormField label="Responsável">
+            <Select value={form.responsavel} onValueChange={v => setForm({ ...form, responsavel: v })}>
+              <SelectTrigger leftIcon={<UserCheck size={16} />}>
+                <SelectValue placeholder="Selecione o responsável..." />
+              </SelectTrigger>
+              <SelectContent>
+                {usuarios.map((u: any) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* ── Update Modal (Atualizar Realizado) ── */}
+      <Modal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        onConfirm={handleUpdate}
+        title="Atualizar Realizado"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsUpdateModalOpen(false)}>Cancelar</Button>
+            <Button variant="success" onClick={handleUpdate} isLoading={saving}>Atualizar</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-stone-500">
+            Indicador: <strong className="text-brown">{updateTarget?.nome}</strong>
+          </p>
+          <FormField label="Período de Referência">
+            <Select value={updatePeriodo} onValueChange={setUpdatePeriodo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o período" />
+              </SelectTrigger>
+              <SelectContent>
+                {getPeriodosComAno(updateTarget?.frequenciaAtualizacao || 'MENSAL').map((label: string, i: number) => (
+                  <SelectItem key={i} value={i.toString()}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField label="Valor realizado">
+            <CurrencyInput
+              value={updateValue}
+              onChange={setUpdateValue}
+            />
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* ── Confirm Delete ── */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Excluir Indicador"
+        message={`Deseja excluir "${deleteTarget?.nome}"?`}
+        confirmLabel="Excluir"
+      />
+    </div>
+  );
 };
