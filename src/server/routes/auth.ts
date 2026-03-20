@@ -8,7 +8,8 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { loginSchema, trocarSenhaSchema, refreshTokenSchema, validarSenha, gerarSenhaTemporaria, updatePerfilSchema, updateAvatarSchema } from '../schemas/index.js';
 import { logAudit } from '../utils/audit.js';
-import { sendEmail, buildEmailHtml } from '../services/email.js';
+import { sendEmail, buildForgotPasswordEmailHtml } from '../services/email.js';
+import { emailConfig } from '../services/email-config.js';
 import type { User } from '../types/index.js';
 
 export const authRouter = Router();
@@ -394,24 +395,14 @@ authRouter.post('/esqueci-senha', async (req, res) => {
     );
 
     // Enviar email com template Saritur
-    const html = buildEmailHtml({
-      title: 'Redefinição de Senha',
-      emoji: '🔑',
-      greeting: `Olá, ${user.nome}!`,
-      bodyText: 'Recebemos uma solicitação de redefinição de senha para sua conta no SGM — Sistema de Gestão de Metas.',
-      details: [
-        { label: 'Sua nova senha temporária', value: senhaTemp, highlight: true },
-      ],
-      extraText: 'Ao fazer login com essa senha, você será redirecionado para criar uma nova senha. Se você não solicitou esta redefinição, entre em contato com o administrador.',
-      ctaButton: {
-        label: 'Acessar o SGM',
-        url: config.corsOrigin || 'https://saritur-sgm-app.01brxh.easypanel.host',
-      },
+    const html = buildForgotPasswordEmailHtml({
+      nomeUsuario: user.nome,
+      senhaTemporaria: senhaTemp,
     });
 
     await sendEmail({
       to: user.email,
-      subject: 'SGM Saritur — Redefinição de Senha',
+      subject: `${emailConfig.brand.system} ${emailConfig.brand.name} — Redefinição de Senha`,
       html,
     });
 

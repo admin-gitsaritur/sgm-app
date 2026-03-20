@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeleton';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Search, KeyRound } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users as UsersIcon, Search, KeyRound, Mail } from 'lucide-react';
 import { maskCpf, maskTelefone, formatCpf } from '../lib/masks';
 
 export const Usuarios = () => {
@@ -226,6 +226,13 @@ export const Usuarios = () => {
                     <p className="text-sm text-gray-600">Senha gerada para <strong>{senhaModal?.user?.nome}</strong>:</p>
                     <div className="bg-gray-100 rounded-xl p-4 font-mono text-lg text-[#4E3205] select-all">{senhaModal?.senha}</div>
                     <p className="text-xs text-amber-600">⚠️ Copie esta senha agora. Ela não será exibida novamente.</p>
+                    
+                    <div className="flex items-center gap-2 mt-3 p-3 bg-emerald-50 rounded-xl text-left">
+                        <Mail className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <p className="text-xs text-emerald-700 m-0">
+                            Um email com esses dados de acesso também foi enviado para <strong>{senhaModal?.user?.email || senhaModal?.user?.nome}</strong>.
+                        </p>
+                    </div>
                 </div>
             </FormModal>
 

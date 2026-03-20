@@ -8,6 +8,8 @@ import { config } from '../config.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { User } from '../types/index.js';
+import { sendEmail, buildWelcomeEmailHtml, buildAdminResetEmailHtml } from '../services/email.js';
+import { emailConfig } from '../services/email-config.js';
 
 export const usuariosRouter = Router();
 usuariosRouter.use(authenticate);
@@ -89,6 +91,24 @@ usuariosRouter.post('/', authorize(['ADMIN']), validate(createUsuarioSchema), as
 
     await logAudit(req.user!.id, 'CREATE', 'User', id, null, JSON.stringify({ nome, email, cpf, telefone, role }), req.ip, req.headers['user-agent']);
 
+    // ── Disparar email de boas-vindas ──
+    const adminResult = await query('SELECT nome FROM users WHERE id = $1', [req.user!.id]);
+    const adminNome = adminResult.rows[0]?.nome || 'Administrador';
+
+    const welcomeHtml = buildWelcomeEmailHtml({
+      nomeUsuario: nome,
+      email,
+      role,
+      senhaTemporaria,
+      criadoPorNome: adminNome,
+    });
+
+    sendEmail({
+      to: email,
+      subject: `${emailConfig.brand.system} ${emailConfig.brand.name} — Bem-vindo!`,
+      html: welcomeHtml,
+    }).catch(err => console.error('[Email] Falha ao enviar boas-vindas:', err));
+
     res.json({ success: true, data: { id, senhaTemporaria } });
   } catch (err) {
     console.error('Erro ao criar usuário:', err);
@@ -144,6 +164,23 @@ usuariosRouter.post('/:id/reset-senha', authorize(['ADMIN']), async (req: AuthRe
     );
 
     await logAudit(req.user!.id, 'RESET_SENHA', 'User', usuario.id, null, null, req.ip, req.headers['user-agent']);
+
+    // ── Disparar email de reset ──
+    const adminResult = await query('SELECT nome FROM users WHERE id = $1', [req.user!.id]);
+    const adminNome = adminResult.rows[0]?.nome || 'Administrador';
+
+    const resetHtml = buildAdminResetEmailHtml({
+      nomeUsuario: usuario.nome,
+      senhaTemporaria: novaSenha,
+      resetadoPorNome: adminNome,
+    });
+
+    sendEmail({
+      to: usuario.email,
+      subject: `${emailConfig.brand.system} ${emailConfig.brand.name} — Senha Redefinida`,
+      html: resetHtml,
+    }).catch(err => console.error('[Email] Falha ao enviar reset:', err));
+
     res.json({ success: true, data: { id: usuario.id, senhaTemporaria: novaSenha } });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Erro interno' });

@@ -1,115 +1,134 @@
 import nodemailer from 'nodemailer';
+import { emailConfig } from './email-config.js';
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'mail.saritur.com.br',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true, // SSL
-    auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
-    },
+  host: process.env.SMTP_HOST || 'mail.saritur.com.br',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
 });
 
 interface SendEmailParams {
-    to: string;
-    subject: string;
-    html: string;
+  to: string;
+  subject: string;
+  html: string;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<void> {
-    if (!process.env.SMTP_USER) {
-        console.warn('[Email] SMTP_USER não configurado. Email não enviado.');
-        return;
-    }
+  if (!process.env.SMTP_USER) {
+    console.warn('[Email] SMTP_USER não configurado. Email não enviado.');
+    return;
+  }
 
-    try {
-        await transporter.sendMail({
-            from: `"SGM Saritur" <${process.env.SMTP_USER}>`,
-            to: params.to,
-            subject: params.subject,
-            html: params.html,
-        });
-        console.log(`[Email] Enviado para ${params.to}: ${params.subject}`);
-    } catch (err) {
-        console.error('[Email] Erro ao enviar:', err);
-    }
+  try {
+    await transporter.sendMail({
+      from: `"${emailConfig.brand.system} ${emailConfig.brand.name}" <${process.env.SMTP_USER}>`,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+    console.log(`[Email] ✅ Enviado para ${params.to}: ${params.subject}`);
+  } catch (err) {
+    console.error('[Email] ❌ Erro ao enviar:', err);
+  }
 }
 
 /**
- * Gera o HTML do email usando o template padrão Saritur.
- * Adaptado do saritur-estornos/src/lib/sendEmail.ts
+ * Engine base de geração de HTML para emails.
+ * TODAS as cores, fontes, logos e textos vêm de emailConfig.
+ * ZERO hard-code neste template.
  */
 export function buildEmailHtml(options: {
-    title: string;
-    emoji?: string;
-    greeting?: string;
-    bodyText: string;
-    details?: Array<{ label: string; value: string; highlight?: boolean }>;
-    extraText?: string;
-    ctaButton?: { label: string; url: string };
+  title: string;
+  emoji?: string;
+  greeting?: string;
+  bodyText: string;
+  details?: Array<{ label: string; value: string; highlight?: boolean }>;
+  extraText?: string;
+  ctaButton?: { label: string; url: string };
 }): string {
-    const currentYear = new Date().getFullYear();
-    const logoUrl = 'https://estorno.saritur.com.br/media/logo_saritur_branco.png';
-    const emoji = options.emoji || '✅';
+  const { brand, assets, colors, fonts, layout } = emailConfig;
+  const emoji = options.emoji || '✅';
 
-    const iconHtml = `<table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;"><tr><td style="width:56px;height:56px;background-color:#FFF3ED;border-radius:50%;text-align:center;vertical-align:middle;font-size:28px;line-height:56px;">${emoji}</td></tr></table>`;
+  // ── Bloco: Ícone com emoji ──
+  const iconHtml = `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="width:${layout.iconSize};height:${layout.iconSize};background-color:${colors.bgIconCircle};border-radius:50%;text-align:center;vertical-align:middle;font-size:${layout.iconFontSize};line-height:${layout.iconSize};">
+          ${emoji}
+        </td>
+      </tr>
+    </table>`;
 
-    const greetingHtml = options.greeting
-        ? `<p style="font-size:15px;line-height:1.6;color:#666;margin:0 0 16px;font-weight:300;">${options.greeting}</p>`
-        : '';
+  // ── Bloco: Saudação ──
+  const greetingHtml = options.greeting
+    ? `<p style="font-size:15px;line-height:1.6;color:${colors.textBody};margin:0 0 16px;font-weight:300;">${options.greeting}</p>`
+    : '';
 
-    const bodyHtml = `<p style="font-size:15px;line-height:1.6;color:#666;margin:0 0 24px;font-weight:300;">${options.bodyText}</p>`;
+  // ── Bloco: Texto principal ──
+  const bodyHtml = `<p style="font-size:15px;line-height:1.6;color:${colors.textBody};margin:0 0 24px;font-weight:300;">${options.bodyText}</p>`;
 
-    const detailsHtml = options.details
-        ? `<div style="background-color:#FAFAFA;border:1px solid #F0F0F0;border-radius:12px;padding:24px;margin-bottom:32px;">
+  // ── Bloco: Detalhes (caixa cinza) ──
+  const detailsHtml = options.details
+    ? `<div style="background-color:${colors.bgDetails};border:1px solid ${colors.borderLight};border-radius:${layout.borderRadiusInner};padding:24px;margin-bottom:32px;">
         ${options.details.map((d, i) => {
-            const isLast = i === options.details!.length - 1;
-            const rowStyle = isLast
-                ? 'display:flex;justify-content:space-between;padding-top:16px;border-top:1px dashed #EAEAEA;font-weight:600;font-size:16px;color:#4E3205;'
-                : 'display:flex;justify-content:space-between;margin-bottom:16px;font-size:14px;';
-            const valueStyle = d.highlight ? 'font-weight:600;color:#F37137;text-align:right;' : 'color:#333;font-weight:400;text-align:right;';
-            return `<div style="${rowStyle}">
-            <span style="color:#888;">${d.label}</span>
+          const isLast = i === options.details!.length - 1;
+          const rowStyle = isLast
+            ? `display:flex;justify-content:space-between;padding-top:16px;border-top:1px dashed ${colors.borderMedium};font-weight:600;font-size:16px;color:${colors.textPrimary};`
+            : 'display:flex;justify-content:space-between;margin-bottom:16px;font-size:14px;';
+          const valueStyle = d.highlight
+            ? `font-weight:600;color:${colors.textHighlight};text-align:right;`
+            : `color:${colors.textPrimary};font-weight:400;text-align:right;`;
+          return `<div style="${rowStyle}">
+            <span style="color:${colors.textMuted};">${d.label}</span>
             <span style="${valueStyle}">${d.value}</span>
           </div>`;
         }).join('')}
       </div>`
-        : '';
+    : '';
 
-    const extraHtml = options.extraText
-        ? `<p style="font-size:14px;color:#666;margin:0 0 32px;">${options.extraText}</p>`
-        : '';
+  // ── Bloco: Texto extra ──
+  const extraHtml = options.extraText
+    ? `<p style="font-size:14px;color:${colors.textBody};margin:0 0 32px;line-height:1.6;">${options.extraText}</p>`
+    : '';
 
-    const ctaHtml = options.ctaButton
-        ? `<a href="${options.ctaButton.url}" style="display:block;width:100%;text-align:center;background-color:#F37137;color:#FFFFFF;text-decoration:none;padding:16px 0;border-radius:10px;font-weight:600;font-size:15px;box-sizing:border-box;">${options.ctaButton.label}</a>`
-        : '';
+  // ── Bloco: Botão CTA ──
+  const ctaHtml = options.ctaButton
+    ? `<a href="${options.ctaButton.url}" style="display:block;width:100%;text-align:center;background-color:${colors.primary};color:white;text-decoration:none;padding:16px 0;border-radius:${layout.borderRadiusButton};font-weight:600;font-size:15px;box-sizing:border-box;">${options.ctaButton.label}</a>`
+    : '';
 
-    return `<!DOCTYPE html>
+  // ── Documento completo ──
+  return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${options.title} - Saritur</title>
+  <title>${options.title} - ${brand.name}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="${fonts.googleFontsUrl}" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;background-color:#F7F7F9;font-family:'Sora',Arial,sans-serif;color:#333;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F7F7F9;">
+<body style="margin:0;padding:0;background-color:${colors.bgPage};font-family:${fonts.family};color:${colors.textPrimary};-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${colors.bgPage};">
     <tr>
       <td align="center" style="padding:40px 20px;">
-        <table cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.04);">
-          <!-- Header -->
+        <table cellpadding="0" cellspacing="0" border="0" style="max-width:${layout.maxWidth};width:100%;background-color:${colors.bgCard};border-radius:${layout.borderRadius};box-shadow:${layout.shadowCard};">
+
+          <!-- Header com Logo -->
           <tr>
-            <td style="padding:32px 40px 24px;text-align:center;background-color:#F7F7F9;border-radius:16px 16px 0 0;border-bottom:1px solid #EAEAEA;">
-              <img src="${logoUrl}" alt="Saritur" style="max-height:48px;width:auto;" />
+            <td style="padding:${layout.paddingHeader};text-align:center;background-color:${colors.bgPage};border-radius:${layout.borderRadius} ${layout.borderRadius} 0 0;border-bottom:1px solid ${colors.borderHeader};">
+              <img src="${assets.logoUrl}" alt="${brand.name}" style="max-height:48px;width:auto;" />
             </td>
           </tr>
+
           <!-- Corpo -->
           <tr>
-            <td style="padding:40px;">
+            <td style="padding:${layout.paddingBody};">
               ${iconHtml}
-              <h1 style="font-size:22px;font-weight:600;color:#4E3205;margin:0 0 16px;line-height:1.3;">${options.title}</h1>
+              <h1 style="font-size:22px;font-weight:600;color:${colors.textPrimary};margin:0 0 16px;line-height:1.3;">${options.title}</h1>
               ${greetingHtml}
               ${bodyHtml}
               ${detailsHtml}
@@ -117,17 +136,107 @@ export function buildEmailHtml(options: {
               ${ctaHtml}
             </td>
           </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="padding:32px 40px;background-color:#FAFAFA;text-align:center;border-top:1px solid #EAEAEA;border-radius:0 0 16px 16px;">
-              <p style="font-size:12px;color:#999;margin:0 0 8px;">&copy; ${currentYear} Saritur. Todos os direitos reservados.</p>
-              <p style="font-size:12px;color:#999;margin:0;">Este é um email automático, por favor não responda.</p>
+            <td style="padding:${layout.paddingFooter};background-color:${colors.bgFooter};text-align:center;border-top:1px solid ${colors.borderHeader};border-radius:0 0 ${layout.borderRadius} ${layout.borderRadius};">
+              <p style="font-size:12px;color:${colors.textMuted};margin:0 0 8px;">${brand.copyright}</p>
+              <p style="font-size:12px;color:${colors.textMuted};margin:0;">${brand.footerText}</p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
   </table>
 </body>
 </html>`;
+}
+
+/**
+ * Template: Boas-vindas — Novo usuário criado pelo admin.
+ */
+export function buildWelcomeEmailHtml(params: {
+  nomeUsuario: string;
+  email: string;
+  role: string;
+  senhaTemporaria: string;
+  criadoPorNome: string;
+}): string {
+  const { brand, urls } = emailConfig;
+
+  const roleLabels: Record<string, string> = {
+    ADMIN: 'Administrador',
+    GESTOR: 'Gestor',
+    OPERADOR: 'Operador',
+    VISUALIZADOR: 'Visualizador',
+  };
+
+  return buildEmailHtml({
+    title: `Bem-vindo ao ${brand.system}!`,
+    emoji: '👋',
+    greeting: `Olá, ${params.nomeUsuario}!`,
+    bodyText: `Sua conta no <strong>${brand.systemFull}</strong> foi criada por ${params.criadoPorNome}. Abaixo estão seus dados de acesso:`,
+    details: [
+      { label: 'Email de acesso', value: params.email },
+      { label: 'Perfil', value: roleLabels[params.role] || params.role },
+      { label: 'Senha temporária', value: params.senhaTemporaria, highlight: true },
+    ],
+    extraText: '⚠️ <strong>Importante:</strong> No primeiro login, você será solicitado a criar uma nova senha. Nunca compartilhe sua senha com terceiros.',
+    ctaButton: {
+      label: 'Acessar o SGM',
+      url: urls.login,
+    },
+  });
+}
+
+/**
+ * Template: Reset de senha pelo admin.
+ */
+export function buildAdminResetEmailHtml(params: {
+  nomeUsuario: string;
+  senhaTemporaria: string;
+  resetadoPorNome: string;
+}): string {
+  const { brand, urls } = emailConfig;
+
+  return buildEmailHtml({
+    title: 'Senha Redefinida',
+    emoji: '🔑',
+    greeting: `Olá, ${params.nomeUsuario}!`,
+    bodyText: `Sua senha no <strong>${brand.systemFull}</strong> foi redefinida pelo administrador ${params.resetadoPorNome}.`,
+    details: [
+      { label: 'Sua nova senha temporária', value: params.senhaTemporaria, highlight: true },
+    ],
+    extraText: 'Ao fazer login com essa senha, você será redirecionado para criar uma nova senha pessoal. Se você não reconhece esta ação, entre em contato com o administrador do sistema.',
+    ctaButton: {
+      label: 'Fazer Login',
+      url: urls.login,
+    },
+  });
+}
+
+/**
+ * Template: Esqueci minha senha (self-service).
+ */
+export function buildForgotPasswordEmailHtml(params: {
+  nomeUsuario: string;
+  senhaTemporaria: string;
+}): string {
+  const { brand, urls } = emailConfig;
+
+  return buildEmailHtml({
+    title: 'Redefinição de Senha',
+    emoji: '🔑',
+    greeting: `Olá, ${params.nomeUsuario}!`,
+    bodyText: `Recebemos uma solicitação de redefinição de senha para sua conta no <strong>${brand.systemFull}</strong>.`,
+    details: [
+      { label: 'Sua nova senha temporária', value: params.senhaTemporaria, highlight: true },
+    ],
+    extraText: 'Ao fazer login com essa senha, você será redirecionado para criar uma nova senha. Se você não solicitou esta redefinição, entre em contato com o administrador.',
+    ctaButton: {
+      label: 'Acessar o SGM',
+      url: urls.login,
+    },
+  });
 }
