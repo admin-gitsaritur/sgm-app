@@ -2,12 +2,15 @@ import { create } from 'zustand';
 
 interface User {
   id: string;
+  cpf?: string | null;
   nome: string;
   email: string;
+  telefone?: string | null;
   role: string;
   avatar?: string;
   departamento?: string;
   cargo?: string;
+  loginProvider?: 'local' | 'google';
 }
 
 interface AuthState {
@@ -20,6 +23,7 @@ interface AuthState {
   setToken: (token: string) => void;
   clearDeveTrocarSenha: () => void;
   logout: () => void;
+  updateUser: (partial: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -50,4 +54,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('deveTrocarSenha');
     set({ user: null, token: null, refreshToken: null, isAuthenticated: false, deveTrocarSenha: false });
   },
+  updateUser: (partial) => set((state) => {
+    const current = state.user;
+    if (!current) return {};
+    const updated = { ...current, ...partial };
+    localStorage.setItem('user', JSON.stringify(updated));
+    return { user: updated };
+  }),
 }));

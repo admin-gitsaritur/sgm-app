@@ -53,11 +53,18 @@ export const updateRealizadoSchema = z.object({
     realizado: z.number().nonnegative('Não pode ser negativo').finite(),
 });
 
+// ── Regex Helpers ─────────────────────────────────────────
+
+const telefoneRegex = /^\(\d{2}\)\s?\d{4,5}-\d{4}$/;
+const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+
 // ── Usuário Schemas ───────────────────────────────────────
 
 export const createUsuarioSchema = z.object({
     nome: z.string().min(3).max(200).trim(),
     email: z.string().email('Email inválido').max(200).trim().toLowerCase(),
+    cpf: z.string().regex(cpfRegex, 'CPF inválido').optional().nullable(),
+    telefone: z.string().regex(telefoneRegex, 'Telefone inválido').optional().nullable(),
     role: z.enum(['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR']),
     departamento: z.string().max(100).trim().optional().nullable(),
     cargo: z.string().max(100).trim().optional().nullable(),
@@ -66,9 +73,27 @@ export const createUsuarioSchema = z.object({
 export const updateUsuarioSchema = z.object({
     nome: z.string().min(3).max(200).trim().optional(),
     role: z.enum(['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR']).optional(),
+    telefone: z.string().regex(telefoneRegex, 'Telefone inválido').optional().nullable(),
     departamento: z.string().max(100).trim().optional().nullable(),
     cargo: z.string().max(100).trim().optional().nullable(),
     ativo: z.number().int().min(0).max(1).optional(),
+});
+
+// ── Perfil Schemas ────────────────────────────────────────
+
+export const updatePerfilSchema = z.object({
+  nome: z.string().min(3).max(200).trim().optional(),
+  email: z.string().email('Email inválido').max(200).trim().toLowerCase().optional(),
+  telefone: z.string().regex(telefoneRegex, 'Telefone inválido').optional().nullable(),
+});
+
+export const updateAvatarSchema = z.object({
+  avatar: z.string()
+    .max(500_000, 'Imagem muito grande')
+    .refine(
+      (val) => val.startsWith('data:image/') || val.startsWith('http'),
+      'Formato de imagem inválido'
+    ),
 });
 
 // ── Auth Schemas ──────────────────────────────────────────

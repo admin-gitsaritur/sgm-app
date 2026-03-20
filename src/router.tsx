@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { PageLoader } from './components/ui/Spinner';
+import { PageLoader } from './components/ui/spinner';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Metas } from './pages/Metas';
@@ -14,6 +14,7 @@ import { Auditoria } from './pages/Auditoria';
 import { Responsaveis } from './pages/Responsaveis';
 import { Relatorios } from './pages/Relatorios';
 import { Configuracoes } from './pages/Configuracoes';
+import { EditarPerfil } from './pages/EditarPerfil';
 import { Login } from './pages/Login';
 import { TrocarSenha } from './pages/TrocarSenha';
 import { EsqueciSenha } from './pages/EsqueciSenha';
@@ -47,6 +48,7 @@ const AppRoutes = () => {
           <Route path="relatorios" element={<ProtectedRoute roles={['ADMIN', 'GESTOR']}><Relatorios /></ProtectedRoute>} />
           <Route path="usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />
           <Route path="auditoria" element={<ProtectedRoute roles={['ADMIN']}><Auditoria /></ProtectedRoute>} />
+          <Route path="perfil" element={<ProtectedRoute><EditarPerfil /></ProtectedRoute>} />
           <Route path="configuracoes" element={<ProtectedRoute roles={['ADMIN']}><Configuracoes /></ProtectedRoute>} />
         </Route>
       </Routes>

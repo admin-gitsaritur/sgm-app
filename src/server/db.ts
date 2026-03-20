@@ -44,7 +44,7 @@ export async function initDb() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
-        cpf TEXT UNIQUE NOT NULL,
+        cpf TEXT UNIQUE,
         nome TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         telefone TEXT,
@@ -183,6 +183,8 @@ export async function initDb() {
 
     // ── Migrations para bancos existentes ──
     await client.query(`
+      ALTER TABLE users ALTER COLUMN cpf DROP NOT NULL;
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='metas' AND column_name='unidadeMeta') THEN
           ALTER TABLE metas ADD COLUMN "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL';

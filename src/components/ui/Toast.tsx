@@ -1,18 +1,21 @@
-import React from "react"
+"use client"
+
 import { Toaster as SonnerToaster, toast as sonnerToast } from "sonner"
 import { CheckCircle2, XCircle, AlertTriangle, Info, Loader2, X } from "lucide-react"
 
 // ============================================================================
-// TOASTER PROVIDER (Adicionar no Layout)
+// TOASTER PROVIDER (Adicionar no layout)
 // ============================================================================
 
 /**
  * Provider do sistema de toasts Saritur CX.
- * Adicione este componente no seu Layout.
- *
+ * Adicione este componente no seu layout ou providers.
+ * 
  * @example
  * ```tsx
- * import { Toaster } from "./components/ui/Toast"
+ * // No layout.tsx ou providers.tsx
+ * import { Toaster } from "@/components/ui/toast"
+ * 
  * <Toaster />
  * ```
  */
@@ -146,6 +149,14 @@ function ToastContent({ type, title, description, toastId }: { type: ToastType; 
 // FUNÇÕES DE TOAST
 // ============================================================================
 
+/**
+ * Exibe um toast de sucesso.
+ * 
+ * @example
+ * ```tsx
+ * toast.success({ title: "Salvo!", description: "Registro salvo com sucesso." })
+ * ```
+ */
 function success({ title, description, duration = 5000 }: ToastOptions) {
     return sonnerToast.custom(
         (id) => <ToastContent type="success" title={title} description={description} toastId={id} />,
@@ -153,6 +164,14 @@ function success({ title, description, duration = 5000 }: ToastOptions) {
     )
 }
 
+/**
+ * Exibe um toast de erro.
+ * 
+ * @example
+ * ```tsx
+ * toast.error({ title: "Erro!", description: "Não foi possível salvar." })
+ * ```
+ */
 function error({ title, description, duration = 5000 }: ToastOptions) {
     return sonnerToast.custom(
         (id) => <ToastContent type="error" title={title} description={description} toastId={id} />,
@@ -160,6 +179,14 @@ function error({ title, description, duration = 5000 }: ToastOptions) {
     )
 }
 
+/**
+ * Exibe um toast de aviso.
+ * 
+ * @example
+ * ```tsx
+ * toast.warning({ title: "Atenção!", description: "Sua sessão irá expirar." })
+ * ```
+ */
 function warning({ title, description, duration = 5000 }: ToastOptions) {
     return sonnerToast.custom(
         (id) => <ToastContent type="warning" title={title} description={description} toastId={id} />,
@@ -167,6 +194,14 @@ function warning({ title, description, duration = 5000 }: ToastOptions) {
     )
 }
 
+/**
+ * Exibe um toast informativo.
+ * 
+ * @example
+ * ```tsx
+ * toast.info({ title: "Novidade!", description: "Sistema atualizado." })
+ * ```
+ */
 function info({ title, description, duration = 5000 }: ToastOptions) {
     return sonnerToast.custom(
         (id) => <ToastContent type="info" title={title} description={description} toastId={id} />,
@@ -174,6 +209,18 @@ function info({ title, description, duration = 5000 }: ToastOptions) {
     )
 }
 
+/**
+ * Exibe um toast de loading.
+ * Retorna o ID do toast para poder atualizá-lo depois.
+ * 
+ * @example
+ * ```tsx
+ * const toastId = toast.loading({ title: "Processando..." })
+ * // Depois de completar:
+ * toast.dismiss(toastId)
+ * toast.success({ title: "Concluído!" })
+ * ```
+ */
 function loading({ title, description }: Omit<ToastOptions, "duration">) {
     return sonnerToast.custom(
         (id) => <ToastContent type="loading" title={title} description={description} toastId={id} />,
@@ -181,6 +228,9 @@ function loading({ title, description }: Omit<ToastOptions, "duration">) {
     )
 }
 
+/**
+ * Fecha um toast pelo ID.
+ */
 function dismiss(toastId?: string | number) {
     sonnerToast.dismiss(toastId)
 }

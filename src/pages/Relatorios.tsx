@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../services/api';
-import { Button } from '../components/ui/Button';
+import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { FileText, Download, AlertTriangle, RefreshCw, Calendar, TrendingUp, Target, Users } from 'lucide-react';
 

@@ -6,7 +6,7 @@ import { query } from '../db.js';
 import { config } from '../config.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { loginSchema, trocarSenhaSchema, refreshTokenSchema, validarSenha, gerarSenhaTemporaria } from '../schemas/index.js';
+import { loginSchema, trocarSenhaSchema, refreshTokenSchema, validarSenha, gerarSenhaTemporaria, updatePerfilSchema, updateAvatarSchema } from '../schemas/index.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmail, buildEmailHtml } from '../services/email.js';
 import type { User } from '../types/index.js';
@@ -25,7 +25,7 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
       return res.status(401).json({ success: false, error: 'Credenciais inválidas' });
     }
 
-    if (user.ativo === false || user.ativo === 0) {
+    if (!user.ativo) {
       return res.status(403).json({ success: false, error: 'Conta inativa' });
     }
 
@@ -55,14 +55,14 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
-      config.jwtSecret,
-      { expiresIn: config.jwtAccessExpiry }
+      config.jwtSecret as string,
+      { expiresIn: config.jwtAccessExpiry as any }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id, type: 'refresh' },
-      config.jwtSecret,
-      { expiresIn: config.jwtRefreshExpiry }
+      config.jwtSecret as string,
+      { expiresIn: config.jwtRefreshExpiry as any }
     );
 
     const { senhaHash, historicoSenhas, ...userSafe } = user;
@@ -73,7 +73,7 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
         user: userSafe,
         token,
         refreshToken,
-        deveTrocarSenha: user.deveTrocarSenha === true || user.deveTrocarSenha === 1,
+        deveTrocarSenha: !!user.deveTrocarSenha,
       },
     });
   } catch (err: any) {
@@ -150,7 +150,7 @@ authRouter.post('/google', async (req, res) => {
       }
     }
 
-    if (user.ativo === false || user.ativo === 0) {
+    if (!user.ativo) {
       return res.status(403).json({ success: false, error: 'Conta inativa' });
     }
 
@@ -161,14 +161,14 @@ authRouter.post('/google', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
-      config.jwtSecret,
-      { expiresIn: config.jwtAccessExpiry }
+      config.jwtSecret as string,
+      { expiresIn: config.jwtAccessExpiry as any }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id, type: 'refresh' },
-      config.jwtSecret,
-      { expiresIn: config.jwtRefreshExpiry }
+      config.jwtSecret as string,
+      { expiresIn: config.jwtRefreshExpiry as any }
     );
 
     const { senhaHash, historicoSenhas, ...userSafe } = user;
@@ -208,8 +208,8 @@ authRouter.post('/refresh', validate(refreshTokenSchema), async (req, res) => {
 
     const newToken = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
-      config.jwtSecret,
-      { expiresIn: config.jwtAccessExpiry }
+      config.jwtSecret as string,
+      { expiresIn: config.jwtAccessExpiry as any }
     );
 
     res.json({ success: true, data: { token: newToken } });
@@ -222,7 +222,7 @@ authRouter.post('/refresh', validate(refreshTokenSchema), async (req, res) => {
 authRouter.get('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const result = await query(
-      'SELECT id, nome, email, role, avatar, departamento, cargo, "deveTrocarSenha" FROM users WHERE id = $1 AND "deletedAt" IS NULL',
+      'SELECT id, cpf, nome, email, telefone, role, avatar, departamento, cargo, "deveTrocarSenha", "loginProvider" FROM users WHERE id = $1 AND "deletedAt" IS NULL',
       [req.user!.id]
     );
     const user = result.rows[0];
@@ -230,6 +230,92 @@ authRouter.get('/me', authenticate, async (req: AuthRequest, res) => {
     if (!user) return res.status(401).json({ success: false, error: 'Usuário não encontrado' });
 
     res.json({ success: true, data: user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── PUT /perfil ───────────────────────────────────────────
+authRouter.put('/perfil', authenticate, validate(updatePerfilSchema), async (req: AuthRequest, res) => {
+  const { nome, email, telefone } = req.body;
+
+  try {
+    const result = await query('SELECT * FROM users WHERE id = $1 AND "deletedAt" IS NULL', [req.user!.id]);
+    const user = result.rows[0] as User | undefined;
+    if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+
+    if (email && email !== user.email) {
+      const existing = await query(
+        'SELECT 1 FROM users WHERE email = $1 AND id != $2 AND "deletedAt" IS NULL',
+        [email, user.id]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ success: false, error: 'Email já cadastrado por outro usuário' });
+      }
+    }
+
+    const updatedNome = nome || user.nome;
+    const updatedEmail = email || user.email;
+    const updatedTelefone = telefone !== undefined ? telefone : user.telefone;
+
+    await query(
+      `UPDATE users SET nome = $1, email = $2, telefone = $3 WHERE id = $4`,
+      [updatedNome, updatedEmail, updatedTelefone, user.id]
+    );
+
+    await logAudit(user.id, 'UPDATE', 'User', user.id,
+      JSON.stringify({ nome: user.nome, email: user.email, telefone: user.telefone }),
+      JSON.stringify({ nome: updatedNome, email: updatedEmail, telefone: updatedTelefone }),
+      req.ip, req.headers['user-agent']
+    );
+
+    const updated = await query(
+      `SELECT id, cpf, nome, email, telefone, role, avatar, departamento, cargo, "deveTrocarSenha", "loginProvider" FROM users WHERE id = $1`,
+      [user.id]
+    );
+
+    res.json({ success: true, data: updated.rows[0] });
+  } catch (err) {
+    console.error('Erro ao atualizar perfil:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── PUT /perfil/avatar ────────────────────────────────────
+authRouter.put('/perfil/avatar', authenticate, validate(updateAvatarSchema), async (req: AuthRequest, res) => {
+  const { avatar } = req.body;
+
+  try {
+    await query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, req.user!.id]);
+
+    await logAudit(req.user!.id, 'UPDATE_AVATAR', 'User', req.user!.id,
+      null, null,
+      req.ip, req.headers['user-agent']
+    );
+
+    res.json({ success: true, data: { avatar } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── DELETE /perfil/avatar ─────────────────────────────────
+authRouter.delete('/perfil/avatar', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const result = await query('SELECT "googleId" FROM users WHERE id = $1', [req.user!.id]);
+    const user = result.rows[0];
+
+    // O avatar do Google fica salvo na primeira autenticação. Setar null.
+    const googleAvatar = null;
+
+    await query('UPDATE users SET avatar = $1 WHERE id = $2', [googleAvatar, req.user!.id]);
+    
+    await logAudit(req.user!.id, 'UPDATE_AVATAR', 'User', req.user!.id,
+      null, null,
+      req.ip, req.headers['user-agent']
+    );
+
+    res.json({ success: true, data: { avatar: googleAvatar } });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Erro interno' });
   }

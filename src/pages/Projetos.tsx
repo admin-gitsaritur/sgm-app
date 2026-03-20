@@ -1,20 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '../components/ui/Select';
+} from '../components/ui/select';
 import {
   DataTable, DataTableCellPrimary, DataTableBadge,
   type Column,
-} from '../components/ui/DataTable';
-import { ActionButton } from '../components/ui/ActionButton';
+} from '../components/ui/data-table';
+import { ActionButton } from '../components/ui/action-button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { FormField } from '../components/ui/FormField';
 import { IconBadge } from '../components/ui/IconBadge';
 import { CellText } from '../components/ui/CellText';
-import { toast } from '../components/ui/Toast';
+import { toast } from '../components/ui/toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Plus, Briefcase, Percent } from 'lucide-react';

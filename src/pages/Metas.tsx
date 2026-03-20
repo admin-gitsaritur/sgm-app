@@ -1,22 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '../components/ui/Select';
+} from '../components/ui/select';
 import {
   DataTable, DataTableCellPrimary, DataTableStatusBadge, DataTableBadge,
   type Column,
-} from '../components/ui/DataTable';
-import { ActionButton } from '../components/ui/ActionButton';
-import { ProgressBar } from '../components/ui/ProgressBar';
+} from '../components/ui/data-table';
+import { ActionButton } from '../components/ui/action-button';
+import { ProgressBar } from '../components/ui/progress-bar';
 import { PageHeader } from '../components/ui/PageHeader';
 import { FormField } from '../components/ui/FormField';
 import { CurrencyInput } from '../components/ui/CurrencyInput';
 import { IconBadge } from '../components/ui/IconBadge';
 import { CellText } from '../components/ui/CellText';
-import { toast } from '../components/ui/Toast';
+import { toast } from '../components/ui/toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Plus, Gauge, Calendar, DollarSign, Percent, Hash } from 'lucide-react';

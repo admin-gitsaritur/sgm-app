@@ -54,8 +54,10 @@ export interface Indicador {
 
 export interface User {
     id: string;
+    cpf: string | null;
     nome: string;
     email: string;
+    telefone: string | null;
     senhaHash: string;
     role: 'ADMIN' | 'GESTOR' | 'OPERADOR' | 'VISUALIZADOR';
     ativo: number;
@@ -71,13 +73,15 @@ export interface User {
     historicoSenhas: string; // JSON array of hashes
     senhaAlteradaEm: string | null;
     deletedAt: string | null;
+    googleId: string | null;
+    loginProvider: 'local' | 'google';
 }
 
 export interface AuditLog {
     id: string;
     timestamp: string;
     userId: string;
-    acao: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'RESET_SENHA' | 'TROCAR_SENHA';
+    acao: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGIN_GOOGLE' | 'LOGOUT' | 'RESET_SENHA' | 'TROCAR_SENHA' | 'UPDATE_AVATAR';
     entidade: 'Meta' | 'Projeto' | 'Indicador' | 'User' | 'Config';
     entidadeId: string;
     dadosAnteriores: string | null;

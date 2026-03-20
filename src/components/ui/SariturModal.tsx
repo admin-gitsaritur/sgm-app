@@ -39,14 +39,14 @@
 import * as React from "react"
 import { X } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { Button } from "./Button"
+import { Button } from "./button"
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogDescription,
-} from "./Dialog"
+} from "./dialog"
 
 // ============================================================================
 // TIPOS
@@ -230,7 +230,7 @@ export function AlertModal({
                     <DialogDescription>{typeof message === 'string' ? message : 'Confirmação de ação'}</DialogDescription>
                 </DialogHeader>
 
-                <div className="p-6 flex flex-col gap-6">
+                <div className="p-6 flex flex-col gap-6 bg-white">
                     <div className="flex gap-4 items-start">
                         <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border shrink-0", config.iconBg)}>
                             <span className={config.iconColor}>

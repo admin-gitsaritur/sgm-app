@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useAuthStore } from '../store/authStore';
 
 const API_URL = import.meta.env.VITE_APP_URL ? `${import.meta.env.VITE_APP_URL}/api` : '/api';

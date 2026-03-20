@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { Modal } from '../components/Modal';
+import { FormModal, AlertModal } from '../components/ui/SariturModal';
+import { Button } from '../components/ui/button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { TableSkeleton } from '../components/Skeleton';
 import { Plus, Edit2, Trash2, Users as UsersIcon, Search, KeyRound } from 'lucide-react';
+import { maskCpf, maskTelefone, formatCpf } from '../lib/masks';
 
 export const Usuarios = () => {
     const [usuarios, setUsuarios] = useState<any[]>([]);
@@ -19,7 +20,7 @@ export const Usuarios = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const [form, setForm] = useState({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '' });
+    const [form, setForm] = useState({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '', cpf: '', telefone: '' });
 
     useEffect(() => { fetchData(); }, [busca, filterRole]);
 
@@ -37,14 +38,14 @@ export const Usuarios = () => {
 
     const openCreate = () => {
         setEditingUser(null);
-        setForm({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '' });
+        setForm({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '', cpf: '', telefone: '' });
         setError('');
         setIsModalOpen(true);
     };
 
     const openEdit = (u: any) => {
         setEditingUser(u);
-        setForm({ nome: u.nome, email: u.email, role: u.role, departamento: u.departamento || '', cargo: u.cargo || '' });
+        setForm({ nome: u.nome, email: u.email, role: u.role, departamento: u.departamento || '', cargo: u.cargo || '', cpf: u.cpf || '', telefone: u.telefone || '' });
         setError('');
         setIsModalOpen(true);
     };
@@ -53,11 +54,17 @@ export const Usuarios = () => {
         setSaving(true); setError('');
         try {
             if (editingUser) {
-                const { email, ...body } = form;
-                await api(`/usuarios/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(body) });
+                const { email, cpf, telefone, ...body } = form;
+                const bodyToSend = { ...body, telefone: telefone ? telefone.replace(/\D/g, '') : null };
+                await api(`/usuarios/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(bodyToSend) });
                 setIsModalOpen(false);
             } else {
-                const res = await api('/usuarios', { method: 'POST', body: JSON.stringify(form) });
+                const bodyToSend = { 
+                    ...form, 
+                    cpf: form.cpf ? form.cpf.replace(/\D/g, '') : null, 
+                    telefone: form.telefone ? form.telefone.replace(/\D/g, '') : null 
+                };
+                const res = await api('/usuarios', { method: 'POST', body: JSON.stringify(bodyToSend) });
                 setIsModalOpen(false);
                 if (res.data?.senhaTemporaria) {
                     setSenhaModal({ user: form, senha: res.data.senhaTemporaria });
@@ -121,6 +128,8 @@ export const Usuarios = () => {
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Nome</th>
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Email</th>
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Role</th>
+                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">CPF</th>
+                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Telefone</th>
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Departamento</th>
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Status</th>
                                 <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Último Login</th>
@@ -137,6 +146,8 @@ export const Usuarios = () => {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
                                         <td className="px-6 py-4"><Badge status={u.role} /></td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">{formatCpf(u.cpf || '') || '—'}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">{maskTelefone(u.telefone || '') || '—'}</td>
                                         <td className="px-6 py-4 text-sm text-gray-600">{u.departamento || '—'}</td>
                                         <td className="px-6 py-4"><Badge status={u.ativo ? 'ATIVA' : 'CANCELADA'} /></td>
                                         <td className="px-6 py-4 text-sm text-gray-500">{formatDate(u.ultimoLogin)}</td>
@@ -154,7 +165,19 @@ export const Usuarios = () => {
                 )}
             </div>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUser ? 'Editar Usuário' : 'Novo Usuário'}>
+            <FormModal 
+                open={isModalOpen} 
+                onOpenChange={setIsModalOpen} 
+                title={editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                maxWidth="lg"
+                onConfirm={handleSave}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                        <Button variant="primary" onClick={handleSave} isLoading={saving}>Salvar</Button>
+                    </>
+                }
+            >
                 <div className="space-y-4">
                     {error && <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700 rounded">{error}</div>}
                     <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Nome</label>
@@ -163,6 +186,21 @@ export const Usuarios = () => {
                         <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Email</label>
                             <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
                     )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">CPF</label>
+                            <input 
+                                value={maskCpf(form.cpf)} 
+                                onChange={e => setForm({ ...form, cpf: e.target.value })} 
+                                placeholder="000.000.000-00" 
+                                disabled={!!editingUser}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-500" /></div>
+                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Telefone</label>
+                            <input 
+                                value={maskTelefone(form.telefone)} 
+                                onChange={e => setForm({ ...form, telefone: e.target.value })} 
+                                placeholder="(00) 00000-0000" 
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
+                    </div>
                     <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Role</label>
                         <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
                             <option value="ADMIN">Admin</option><option value="GESTOR">Gestor</option>
@@ -174,24 +212,33 @@ export const Usuarios = () => {
                         <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Cargo</label>
                             <input value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
                     </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                        <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                        <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm text-white bg-[#F37137] rounded-lg hover:bg-[#d95f27] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
-                    </div>
                 </div>
-            </Modal>
+            </FormModal>
 
-            <Modal isOpen={!!senhaModal} onClose={() => setSenhaModal(null)} title="Senha Temporária" size="sm">
+            <FormModal 
+                open={!!senhaModal} 
+                onOpenChange={(op) => { if(!op) setSenhaModal(null); }} 
+                title="Senha Temporária" 
+                maxWidth="sm"
+                footer={<Button variant="primary" onClick={() => setSenhaModal(null)}>Entendi</Button>}
+            >
                 <div className="text-center space-y-4">
                     <p className="text-sm text-gray-600">Senha gerada para <strong>{senhaModal?.user?.nome}</strong>:</p>
                     <div className="bg-gray-100 rounded-xl p-4 font-mono text-lg text-[#4E3205] select-all">{senhaModal?.senha}</div>
                     <p className="text-xs text-amber-600">⚠️ Copie esta senha agora. Ela não será exibida novamente.</p>
-                    <button onClick={() => setSenhaModal(null)} className="px-4 py-2 bg-[#F37137] text-white rounded-lg hover:bg-[#d95f27] text-sm">Entendi</button>
                 </div>
-            </Modal>
+            </FormModal>
 
-            <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-                title="Desativar Usuário" message={`Deseja desativar "${deleteTarget?.nome}"?`} confirmLabel="Desativar" />
+            <AlertModal
+                open={!!deleteTarget}
+                onOpenChange={(op) => { if (!op) setDeleteTarget(null); }}
+                title="Desativar Usuário"
+                message={`Deseja desativar o usuário "${deleteTarget?.nome}"?`}
+                confirmText="Desativar"
+                cancelText="Cancelar"
+                type="danger"
+                onConfirm={handleDelete}
+            />
         </div>
     );
 };

@@ -1,67 +1,419 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* ============================================================================
-   TEMA SARITUR — Design Tokens (CSS Custom Properties)
-   ============================================================================ */
-@theme {
-  --color-primary: #F37137;
-  --color-brown: #4E3205;
-  --color-saritur-yellow: #F6D317;
+@plugin "tailwindcss-animate";
 
-  /* Ring colors para botões */
-  --ring-primary: oklch(from #F37137 l c h / 0.25);
-  --ring-danger: oklch(from #dc2626 l c h / 0.25);
-  --ring-warning: oklch(from #f59e0b l c h / 0.25);
-  --ring-success: oklch(from #059669 l c h / 0.25);
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sora), system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Saritur Colors */
+  --color-saritur-orange: var(--saritur-orange);
+  --color-saritur-brown: var(--saritur-brown);
+  --color-saritur-yellow: var(--saritur-yellow);
+
+  /* Transnorte Colors */
+  --color-transnorte-dark: var(--transnorte-dark);
+  --color-transnorte-light: var(--transnorte-light);
+
+  /* Aliases curtos */
+  --color-brown: var(--saritur-brown);
+  --color-nps-promotor: var(--nps-promotor);
+  --color-nps-neutro: var(--nps-neutro);
+  --color-nps-detrator: var(--nps-detrator);
+  --color-pdv-terminal: var(--pdv-terminal);
+  --color-pdv-estacao: var(--pdv-estacao);
+  --color-pdv-parada: var(--pdv-parada);
+  --color-pdv-ponto: var(--pdv-ponto);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
-/* ============================================================================
-   BASE STYLES
-   ============================================================================ */
-body {
-  font-family: 'Sora', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Background - Clean off-white */
+  --background: #FAFAFA;
+  --foreground: #1F2937;
+
+  /* Cards */
+  --card: #FFFFFF;
+  --card-foreground: #4E3205;
+  --popover: #FFFFFF;
+  --popover-foreground: #4E3205;
+
+  /* Primary - Saritur Orange */
+  --primary: #F37137;
+  --primary-foreground: #FFFFFF;
+
+  /* Secondary */
+  --secondary: #F3F4F6;
+  --secondary-foreground: #4E3205;
+
+  /* Muted */
+  --muted: #F3F4F6;
+  --muted-foreground: #9CA3AF;
+
+  /* Accent */
+  --accent: #FFF4EF;
+  --accent-foreground: #F37137;
+
+  --destructive: #EF4444;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #F37137;
+
+  /* Charts */
+  --chart-1: #F37137;
+  --chart-2: #4E3205;
+  --chart-3: #F6D317;
+  --chart-4: #10B981;
+  --chart-5: #6366F1;
+
+  /* Sidebar */
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #4E3205;
+  --sidebar-primary: #F37137;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FFF4EF;
+  --sidebar-accent-foreground: #F37137;
+  --sidebar-border: #F3F4F6;
+  --sidebar-ring: #F37137;
+
+  /* Saritur Custom Colors */
+  --saritur-orange: #F37137;
+  --saritur-brown: #4E3205;
+  --saritur-yellow: #F6D317;
+
+  /* Transnorte Colors */
+  --transnorte-dark: #322F6B;
+  --transnorte-light: #91D8F7;
+
+  /* Ring/Focus Shadows (transparência para sombras de hover) */
+  --ring-primary: rgba(243, 113, 55, 0.125);
+  --ring-danger: rgba(225, 29, 72, 0.2);
+  --ring-warning: rgba(245, 158, 11, 0.2);
+  --ring-success: rgba(5, 150, 105, 0.2);
+
+  /* Tooltip/Popover Shadows */
+  --shadow-tooltip: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(78, 50, 5, 0.08);
+  --shadow-glow-primary: 0 4px 10px -2px rgba(243, 113, 55, 0.3);
+
+  /* NPS Colors */
+  --nps-promotor: #10B981;
+  --nps-neutro: #F59E0B;
+  --nps-detrator: #EF4444;
+
+  /* PDV Classifications */
+  --pdv-terminal: #8B5CF6;
+  --pdv-estacao: #F97316;
+  --pdv-parada: #06B6D4;
+  --pdv-ponto: #EAB308;
+
+  /* Brand Aliases */
+  --color-brand-primary: var(--saritur-orange);
+  --color-brand-secondary: var(--saritur-brown);
+  --color-brand-tertiary: var(--saritur-yellow);
+
+  --radius: 0.75rem;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.dark {
+  --background: #0F0F0F;
+  --foreground: #FAFAFA;
+  --card: #1A1A1A;
+  --card-foreground: #FAFAFA;
+  --popover: #1A1A1A;
+  --popover-foreground: #FAFAFA;
+
+  --primary: #F37137;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #262626;
+  --secondary-foreground: #FAFAFA;
+  --muted: #262626;
+  --muted-foreground: #A1A1AA;
+  --accent: #2D2520;
+  --accent-foreground: #F37137;
+  --destructive: #EF4444;
+  --border: #262626;
+  --input: #262626;
+  --ring: #F37137;
+
+  --chart-1: #F37137;
+  --chart-2: #F6D317;
+  --chart-3: #10B981;
+  --chart-4: #6366F1;
+  --chart-5: #EC4899;
+
+  --sidebar: #1A1A1A;
+  --sidebar-foreground: #FAFAFA;
+  --sidebar-primary: #F37137;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #2D2520;
+  --sidebar-accent-foreground: #F37137;
+  --sidebar-border: #262626;
+  --sidebar-ring: #F37137;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+@layer base {
+  * {
+    @apply border-border;
+    outline: none !important;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
+@layer utilities {
 
-::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
+  /* Soft shadow for cards - Ultra-soft with Saritur brown tint */
+  .soft-shadow {
+    box-shadow: 0 4px 20px -2px rgba(78, 50, 5, 0.03), 0 2px 6px -2px rgba(0, 0, 0, 0.02);
+  }
 
-/* Focus: cada componente controla seu próprio ring via Tailwind */
+  .soft-shadow-md {
+    box-shadow: 0 6px 24px -4px rgba(78, 50, 5, 0.05), 0 4px 10px -4px rgba(0, 0, 0, 0.03);
+  }
 
-/* Soft shadow utility (usado nos cards do saritur-cx) */
-.soft-shadow {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-}
+  .soft-shadow-lg {
+    box-shadow: 0 10px 40px -6px rgba(78, 50, 5, 0.08), 0 4px 12px -4px rgba(0, 0, 0, 0.04);
+  }
 
-/* Tab underline transition */
-.tab-underline {
-  transition: left 0.3s ease, width 0.3s ease;
-}
+  /* ══════════════════════════════════════════════════════════════
+     GLASSMORPHISM SCROLLBAR — Universal System Scrollbar
+     ══════════════════════════════════════════════════════════════ */
 
-/* Custom scrollbar for DataTable */
-.custom-scroll::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 162, 158, 0.35) transparent;
+  }
 
-.custom-scroll::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 2px;
+  /* Webkit (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(168, 162, 158, 0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 162, 158, 0.55);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 8px rgba(168, 162, 158, 0.2);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(120, 113, 108, 0.6);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Tab underline animation */
+  .tab-underline {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Glass effects */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+
+  .glass-header {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-orange {
+    background: linear-gradient(135deg, #F37137 0%, #FF8F5C 100%);
+  }
+
+  .gradient-brown {
+    background: linear-gradient(135deg, #4E3205 0%, #7A5A1A 100%);
+  }
+
+  /* Hover elevation animation */
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Tag Rigid Blink Animation (Offline/Pausado) */
+  @keyframes rigid-blink {
+
+    0%,
+    49% {
+      opacity: 1;
+    }
+
+    50%,
+    100% {
+      opacity: 0.3;
+    }
+  }
+
+  .animate-rigid-blink {
+    animation: rigid-blink 1s steps(1) infinite;
+  }
+
+  /* Spinner Animations */
+  @keyframes spinner-rotate {
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spinner-dash {
+    0% {
+      stroke-dasharray: 1, 150;
+      stroke-dashoffset: 0;
+    }
+
+    50% {
+      stroke-dasharray: 90, 150;
+      stroke-dashoffset: -35;
+    }
+
+    100% {
+      stroke-dasharray: 90, 150;
+      stroke-dashoffset: -124;
+    }
+  }
+
+  .animate-spinner-rotate {
+    animation: spinner-rotate 2s linear infinite;
+  }
+
+  .animate-spinner-dash {
+    animation: spinner-dash 1.5s ease-in-out infinite;
+  }
+
+  /* Stepper Radar Animation */
+  @keyframes stepper-radar {
+    0% {
+      box-shadow: 0 0 0 0 rgba(243, 113, 55, 0.4);
+    }
+
+    70% {
+      box-shadow: 0 0 0 10px rgba(243, 113, 55, 0);
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(243, 113, 55, 0);
+    }
+  }
+
+  .animate-stepper-radar {
+    animation: stepper-radar 2s infinite;
+  }
+
+  /* Float Animation (Login Bubbles) */
+  @keyframes float {
+    0% {
+      transform: translateY(0) scale(0.8);
+      opacity: 0;
+    }
+
+    10% {
+      opacity: 0.4;
+    }
+
+    90% {
+      opacity: 0.4;
+    }
+
+    100% {
+      transform: translateY(-100vh) scale(1.2);
+      opacity: 0;
+    }
+  }
+
+  /* Heartbeat Animation (Health Score) */
+  @keyframes heartbeat {
+
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    14% {
+      transform: scale(1.2);
+    }
+
+    28% {
+      transform: scale(1);
+    }
+
+    42% {
+      transform: scale(1.2);
+    }
+
+    70% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-heartbeat {
+    animation: heartbeat 1.5s ease-in-out infinite;
+  }
 }

@@ -17,6 +17,8 @@ import '@xyflow/react/dist/style.css';
 import { api } from '../services/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Target, Briefcase, BarChart2, Layers } from 'lucide-react';
+import { Spinner } from '../components/ui/spinner';
+import { CardDescription } from '../components/ui/card';
 
 // ── Node Colors by Layer ──
 const LAYER_CONFIG = {
@@ -164,6 +166,11 @@ function savePositions(nodes: Node[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
 }
 
+function clearPositions() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+
 function loadPositions(): Record<string, { x: number; y: number }> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -298,13 +305,9 @@ export const Mapeamento = () => {
   }, [metas, projetos, indicadores]);
 
   // Save positions when user stops dragging
-  const handleNodeDragStop = useCallback((_: any, node: Node) => {
-    setNodes(nds => {
-      const updated = nds.map(n => n.id === node.id ? { ...n, position: node.position } : n);
-      savePositions(updated);
-      return updated;
-    });
-  }, [setNodes]);
+  const handleNodeDragStop = useCallback((_: any, __: Node, nodes: Node[]) => {
+    savePositions(nodes);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -338,8 +341,8 @@ export const Mapeamento = () => {
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <span className="text-sm text-stone-400 font-medium">Carregando mapeamento...</span>
+              <Spinner size="lg" />
+              <CardDescription>Carregando mapeamento...</CardDescription>
             </div>
           </div>
         ) : (

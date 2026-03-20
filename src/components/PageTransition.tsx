@@ -38,11 +38,11 @@ export const PageTransition = ({ children }: PageTransitionProps) => {
         <AnimatePresence mode="wait">
             <motion.div
                 key={location.pathname}
-                variants={pageVariants}
+                variants={pageVariants as any}
                 initial="initial"
                 animate="enter"
                 exit="exit"
-                style={{ width: '100%', minHeight: '100dvh' }}
+                style={{ width: '100%' }}
             >
                 {children}
             </motion.div>

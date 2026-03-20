@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils"
 // USER AVATAR — Avatar com foto ou iniciais do usuário
 // ============================================================================
 
-type AvatarSize = "sm" | "md" | "lg"
+type AvatarSize = "sm" | "md" | "lg" | "xl"
 
 interface UserAvatarProps {
     /** Nome completo do usuário (usado para gerar iniciais como fallback) */
@@ -22,6 +22,7 @@ const SIZE_CLASSES: Record<AvatarSize, string> = {
     sm: "w-7 h-7 text-xs",
     md: "w-9 h-9 text-sm",
     lg: "w-11 h-11 text-base",
+    xl: "w-24 h-24 text-4xl",
 }
 
 /**

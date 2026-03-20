@@ -35,7 +35,7 @@ usuariosRouter.get('/', authorize(['ADMIN']), async (req: AuthRequest, res) => {
     const total = parseInt(totalResult.rows[0].count);
 
     const result = await query(`
-      SELECT id, nome, email, role, ativo, "ultimoLogin", "criadoEm", departamento, cargo, "deveTrocarSenha"
+      SELECT id, cpf, nome, email, telefone, role, ativo, "ultimoLogin", "criadoEm", departamento, cargo, "deveTrocarSenha", avatar
       FROM users WHERE ${where} ORDER BY "criadoEm" DESC LIMIT $${idx++} OFFSET $${idx++}
     `, [...params, limit, offset]);
 
@@ -54,7 +54,7 @@ usuariosRouter.get('/', authorize(['ADMIN']), async (req: AuthRequest, res) => {
 usuariosRouter.get('/:id', authorize(['ADMIN']), async (req: AuthRequest, res) => {
   try {
     const result = await query(
-      'SELECT id, nome, email, role, ativo, "ultimoLogin", "criadoEm", departamento, cargo FROM users WHERE id = $1 AND "deletedAt" IS NULL',
+      'SELECT id, cpf, nome, email, telefone, role, ativo, "ultimoLogin", "criadoEm", departamento, cargo, avatar, "loginProvider" FROM users WHERE id = $1 AND "deletedAt" IS NULL',
       [req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
@@ -66,11 +66,16 @@ usuariosRouter.get('/:id', authorize(['ADMIN']), async (req: AuthRequest, res) =
 
 // ── POST / — Create ──────────────────────────────────────
 usuariosRouter.post('/', authorize(['ADMIN']), validate(createUsuarioSchema), async (req: AuthRequest, res) => {
-  const { nome, email, role, departamento, cargo } = req.body;
+  const { nome, email, cpf, telefone, role, departamento, cargo } = req.body;
 
   try {
     const existing = await query('SELECT 1 FROM users WHERE email = $1 AND "deletedAt" IS NULL', [email]);
     if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email já cadastrado' });
+
+    if (cpf) {
+      const cpfExists = await query('SELECT 1 FROM users WHERE cpf = $1 AND "deletedAt" IS NULL', [cpf]);
+      if (cpfExists.rows.length > 0) return res.status(400).json({ success: false, error: 'CPF já cadastrado' });
+    }
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -78,11 +83,11 @@ usuariosRouter.post('/', authorize(['ADMIN']), validate(createUsuarioSchema), as
     const hash = await bcrypt.hash(senhaTemporaria, config.bcryptRounds);
 
     await query(`
-      INSERT INTO users (id, nome, email, "senhaHash", role, ativo, "criadoPor", "criadoEm", departamento, cargo, "deveTrocarSenha", "historicoSenhas")
-      VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, true, $10)
-    `, [id, nome, email, hash, role, req.user!.id, now, departamento || null, cargo || null, JSON.stringify([hash])]);
+      INSERT INTO users (id, cpf, nome, email, telefone, "senhaHash", role, ativo, "criadoPor", "criadoEm", departamento, cargo, "deveTrocarSenha", "historicoSenhas")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10, $11, true, $12)
+    `, [id, cpf || null, nome, email, telefone || null, hash, role, req.user!.id, now, departamento || null, cargo || null, JSON.stringify([hash])]);
 
-    await logAudit(req.user!.id, 'CREATE', 'User', id, null, { nome, email, role }, req.ip, req.headers['user-agent']);
+    await logAudit(req.user!.id, 'CREATE', 'User', id, null, JSON.stringify({ nome, email, cpf, telefone, role }), req.ip, req.headers['user-agent']);
 
     res.json({ success: true, data: { id, senhaTemporaria } });
   } catch (err) {
@@ -98,19 +103,20 @@ usuariosRouter.put('/:id', authorize(['ADMIN']), validate(updateUsuarioSchema), 
     const usuario = result.rows[0] as User | undefined;
     if (!usuario) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
 
-    const { nome, role, departamento, cargo, ativo } = req.body;
+    const { nome, role, telefone, departamento, cargo, ativo } = req.body;
 
     await query(`
-      UPDATE users SET nome = $1, role = $2, departamento = $3, cargo = $4, ativo = $5 WHERE id = $6
+      UPDATE users SET nome = $1, role = $2, telefone = $3, departamento = $4, cargo = $5, ativo = $6 WHERE id = $7
     `, [
       nome || usuario.nome, role || usuario.role,
+      telefone !== undefined ? telefone : usuario.telefone,
       departamento !== undefined ? departamento : usuario.departamento,
       cargo !== undefined ? cargo : usuario.cargo,
       ativo !== undefined ? ativo : usuario.ativo,
       usuario.id,
     ]);
 
-    await logAudit(req.user!.id, 'UPDATE', 'User', usuario.id, { nome: usuario.nome, role: usuario.role }, req.body, req.ip, req.headers['user-agent']);
+    await logAudit(req.user!.id, 'UPDATE', 'User', usuario.id, JSON.stringify({ nome: usuario.nome, role: usuario.role, telefone: usuario.telefone }), JSON.stringify(req.body), req.ip, req.headers['user-agent']);
     res.json({ success: true, data: { id: usuario.id } });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Erro interno' });

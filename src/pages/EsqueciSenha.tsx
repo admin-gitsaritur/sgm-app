@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, Send, CheckCircle } from 'lucide-react';
-import { Spinner } from '../components/ui/Spinner';
+import { Spinner } from '../components/ui/spinner';
 
 export const EsqueciSenha = () => {
     const [email, setEmail] = useState('');

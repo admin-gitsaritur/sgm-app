@@ -1,9 +1,9 @@
-
+"use client"
 
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
-import { cn } from "../../lib/utils"
+import { cn } from "@/lib/utils"
 
 // ============================================================================
 // SELECT PADRÃO SARITUR CX
@@ -67,7 +67,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       className={cn(
         // Base
-        "relative flex w-full items-center justify-between gap-2",
+        "flex w-full items-center justify-between gap-2",
         "h-11 rounded-xl border bg-white",
         "text-sm font-medium text-brown",
         // Padding
@@ -128,7 +128,7 @@ function SelectContent({
           // Base
           "relative z-50 max-h-60 min-w-[8rem] overflow-hidden",
           "bg-white rounded-xl border border-stone-100",
-          "shadow-[0_8px_30px_rgba(0,0,0,0.12)]",
+          "shadow-xl shadow-stone-200/50",
           // Animations
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",

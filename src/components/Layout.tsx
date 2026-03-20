@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Toaster } from './ui/Toast';
+import { Toaster } from './ui/toast';
 import { UserAvatar } from './ui/UserAvatar';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
-} from './ui/DropdownMenu';
+} from './ui/dropdown-menu';
 import {
   Target, Gauge, Briefcase, BarChart2, Users, Shield,
   LogOut, Menu, X, Bell, UserCheck, FileText, Settings, User, ChevronDown, GitBranch
@@ -50,13 +50,15 @@ export const Layout = () => {
     <>
       {/* Logo */}
       <div className={clsx('h-16 flex items-center justify-center border-b border-stone-100', collapsed ? 'px-4' : 'px-5')}>
-        {collapsed ? (
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <img src="/brands/iso_saritur_branco.svg" alt="SGM" className="w-5 h-5" />
-          </div>
-        ) : (
-          <img src="/brands/logo_saritur_branco.svg" alt="Saritur" className="h-7" />
-        )}
+        <Link to="/dashboard" className="transition-opacity hover:opacity-80">
+          {collapsed ? (
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <img src="/brands/iso_saritur_branco.svg" alt="SGM" className="w-5 h-5" />
+            </div>
+          ) : (
+            <img src="/brands/logo_saritur_branco.svg" alt="Saritur" className="h-7" />
+          )}
+        </Link>
       </div>
 
       {/* Navigation */}
@@ -182,10 +184,9 @@ export const Layout = () => {
                   <p className="text-xs text-stone-400">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled className="opacity-50 cursor-default">
+                <DropdownMenuItem onClick={() => navigate('/perfil')}>
                   <User size={16} />
                   Editar Perfil
-                  <span className="ml-auto text-[10px] text-stone-400 font-medium">em breve</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
                   <Settings size={16} />
@@ -202,9 +203,19 @@ export const Layout = () => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto w-full">
-            <Outlet />
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col min-h-full p-4 md:p-8">
+            <div className="max-w-7xl mx-auto w-full flex-1">
+              <Outlet />
+            </div>
+
+            {/* Footer */}
+            <footer className="max-w-7xl mx-auto w-full mt-8 pt-5 pb-4 border-t border-stone-200/80">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stone-400">
+                <span>© {new Date().getFullYear()} Saritur. Todos os direitos reservados.</span>
+                <span className="font-semibold text-stone-400">Saritur<span className="text-primary font-bold">SGM</span></span>
+              </div>
+            </footer>
           </div>
         </div>
       </main>
