@@ -55,14 +55,14 @@ export const Usuarios = () => {
         try {
             if (editingUser) {
                 const { email, cpf, telefone, ...body } = form;
-                const bodyToSend = { ...body, telefone: telefone ? telefone.replace(/\D/g, '') : null };
+                const bodyToSend = { ...body, telefone: telefone ? telefone : null };
                 await api(`/usuarios/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(bodyToSend) });
                 setIsModalOpen(false);
             } else {
                 const bodyToSend = { 
                     ...form, 
-                    cpf: form.cpf ? form.cpf.replace(/\D/g, '') : null, 
-                    telefone: form.telefone ? form.telefone.replace(/\D/g, '') : null 
+                    cpf: form.cpf ? form.cpf : null, 
+                    telefone: form.telefone ? form.telefone : null 
                 };
                 const res = await api('/usuarios', { method: 'POST', body: JSON.stringify(bodyToSend) });
                 setIsModalOpen(false);
