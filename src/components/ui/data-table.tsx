@@ -428,9 +428,9 @@ export function DataTable<T>({
                     <div className="px-6 py-5 border-t border-stone-100 bg-stone-50/30 flex items-center justify-between shrink-0 rounded-b-3xl">
                         <span className="text-xs text-stone-400">
                             {pagination ? (
-                                <>{showingPrefix} <strong>{startItem.toLocaleString("pt-BR")}</strong> {showingConnector} <strong>{endItem.toLocaleString("pt-BR")}</strong> {showingOf} <strong>{pagination.total.toLocaleString("pt-BR")}</strong> {showingResults}</>
+                                <>{showingPrefix} <strong>{startItem.toLocaleString("pt-BR")}</strong> {showingConnector} <strong>{endItem.toLocaleString("pt-BR")}</strong> {showingOf} <strong>{pagination.total.toLocaleString("pt-BR")}</strong> {showingResults}.</>
                             ) : (
-                                <>{showingPrefix} <strong>{data.length.toLocaleString("pt-BR")}</strong> {showingResults}</>
+                                <>{showingPrefix} <strong>{data.length.toLocaleString("pt-BR")}</strong> {data.length === 1 ? (showingResults.endsWith('es') ? showingResults.slice(0, -2) : showingResults.endsWith('s') ? showingResults.slice(0, -1) : showingResults) : showingResults}.</>
                             )}
                         </span>
 

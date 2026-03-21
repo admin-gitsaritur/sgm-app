@@ -30,8 +30,9 @@ export function Toaster() {
                 unstyled: true,
                 classNames: {
                     toast: `
-                        group relative w-full max-w-sm bg-white rounded-xl shadow-lg 
-                        border border-stone-100 overflow-hidden pointer-events-auto 
+                        group relative w-full max-w-sm rounded-2xl dropdown-shadow
+                        bg-white/85 backdrop-blur-xl border border-white/30
+                        overflow-hidden pointer-events-auto
                         flex items-start gap-3 p-4 border-l-4
                     `,
                     title: "text-sm font-bold",

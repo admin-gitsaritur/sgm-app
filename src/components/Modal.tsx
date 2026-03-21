@@ -64,7 +64,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', footer, o
                         transition={{ duration: 0.2 }}
                         className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}
                     >
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[#eeedea]">
                             <h2 className="text-lg font-bold text-brown">{title}</h2>
                             <button onClick={onClose} className="p-2 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors">
                                 <X size={20} />
@@ -74,7 +74,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', footer, o
                             {children}
                         </div>
                         {footer && (
-                            <div className="flex justify-end gap-3 px-6 py-4 bg-stone-50/50 border-t border-stone-100 rounded-b-2xl">
+                            <div className="flex justify-end gap-3 px-6 py-4 bg-stone-50 border-t border-[#eeedea] rounded-b-2xl">
                                 {footer}
                             </div>
                         )}

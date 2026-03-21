@@ -5,8 +5,19 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeleton';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Search, KeyRound, Mail } from 'lucide-react';
+import { Users as UsersIcon, Plus } from 'lucide-react';
 import { maskCpf, maskTelefone, formatCpf } from '../lib/masks';
+import { toast } from 'sonner';
+
+import { PageHeader } from '../components/ui/PageHeader';
+import { Input } from '../components/ui/input';
+import { SearchInput } from '../components/ui/search-input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
+import { DataTable, type Column, DataTableCellPrimary, DataTableStatusBadge } from '../components/ui/data-table';
+import { UserAvatar } from '../components/ui/UserAvatar';
+import { ActionGroup, ActionButton } from '../components/ui/action-button';
+import { FormField } from '../components/ui/FormField';
+import { Card, SimpleInfoCard } from '../components/ui/card';
 
 export const Usuarios = () => {
     const [usuarios, setUsuarios] = useState<any[]>([]);
@@ -18,7 +29,6 @@ export const Usuarios = () => {
     const [busca, setBusca] = useState('');
     const [filterRole, setFilterRole] = useState('');
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
 
     const [form, setForm] = useState({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '', cpf: '', telefone: '' });
 
@@ -29,34 +39,36 @@ export const Usuarios = () => {
         try {
             const params = new URLSearchParams();
             if (busca) params.set('busca', busca);
-            if (filterRole) params.set('role', filterRole);
+            if (filterRole && filterRole !== 'ALL') params.set('role', filterRole);
             const res = await api(`/usuarios?${params.toString()}`);
             if (res.success) setUsuarios(res.data);
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
+        } catch (err: any) { 
+            toast.error(err.message || 'Erro ao carregar usuários');
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const openCreate = () => {
         setEditingUser(null);
         setForm({ nome: '', email: '', role: 'OPERADOR', departamento: '', cargo: '', cpf: '', telefone: '' });
-        setError('');
         setIsModalOpen(true);
     };
 
     const openEdit = (u: any) => {
         setEditingUser(u);
         setForm({ nome: u.nome, email: u.email, role: u.role, departamento: u.departamento || '', cargo: u.cargo || '', cpf: u.cpf || '', telefone: u.telefone || '' });
-        setError('');
         setIsModalOpen(true);
     };
 
     const handleSave = async () => {
-        setSaving(true); setError('');
+        setSaving(true);
         try {
             if (editingUser) {
                 const { email, cpf, telefone, ...body } = form;
                 const bodyToSend = { ...body, telefone: telefone ? telefone : null };
                 await api(`/usuarios/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(bodyToSend) });
+                toast.success('Usuário atualizado com sucesso');
                 setIsModalOpen(false);
             } else {
                 const bodyToSend = { 
@@ -65,14 +77,18 @@ export const Usuarios = () => {
                     telefone: form.telefone ? form.telefone : null 
                 };
                 const res = await api('/usuarios', { method: 'POST', body: JSON.stringify(bodyToSend) });
+                toast.success('Usuário criado com sucesso');
                 setIsModalOpen(false);
                 if (res.data?.senhaTemporaria) {
                     setSenhaModal({ user: form, senha: res.data.senhaTemporaria });
                 }
             }
             fetchData();
-        } catch (err: any) { setError(err.message); }
-        finally { setSaving(false); }
+        } catch (err: any) { 
+            toast.error(err.message || 'Erro ao salvar usuário');
+        } finally { 
+            setSaving(false); 
+        }
     };
 
     const handleResetSenha = async (userId: string, userName: string) => {
@@ -80,90 +96,140 @@ export const Usuarios = () => {
             const res = await api(`/usuarios/${userId}/reset-senha`, { method: 'POST' });
             if (res.data?.senhaTemporaria) {
                 setSenhaModal({ user: { nome: userName }, senha: res.data.senhaTemporaria });
+                toast.success('Senha resetada com sucesso');
             }
-        } catch (err: any) { setError(err.message); }
+        } catch (err: any) { 
+            toast.error(err.message || 'Erro ao resetar senha');
+        }
     };
 
     const handleDelete = async () => {
         if (!deleteTarget) return;
-        try { await api(`/usuarios/${deleteTarget.id}`, { method: 'DELETE' }); setDeleteTarget(null); fetchData(); }
-        catch (err: any) { alert(err.message); }
+        try { 
+            await api(`/usuarios/${deleteTarget.id}`, { method: 'DELETE' }); 
+            toast.success('Usuário desativado com sucesso');
+            setDeleteTarget(null); 
+            fetchData(); 
+        }
+        catch (err: any) { 
+            toast.error(err.message || 'Erro ao desativar usuário');
+        }
     };
 
-    const formatDate = (d: string | null) => d ? new Date(d).toLocaleString('pt-BR') : '—';
+    // ── Columns ──
+    const columns: Column<any>[] = [
+        {
+            key: 'nome',
+            header: 'Nome',
+            cellVariant: 'none',
+            render: (_: unknown, row: any) => (
+                <div className="flex items-center gap-3">
+                    <UserAvatar name={row.nome} size="sm" className="bg-primary text-white" />
+                    <DataTableCellPrimary>{row.nome}</DataTableCellPrimary>
+                </div>
+            )
+        },
+        {
+            key: 'email',
+            header: 'Email',
+            hiddenOnMobile: true,
+        },
+        {
+            key: 'role',
+            header: 'Role',
+            cellVariant: 'none',
+            align: 'center',
+            render: (val: unknown) => <Badge status={val as string} />
+        },
+        {
+            key: 'cpf',
+            header: 'CPF',
+            hiddenOnMobile: true,
+            render: (val: unknown) => formatCpf((val as string) || '') || '—'
+        },
+        {
+            key: 'telefone',
+            header: 'Telefone',
+            hiddenOnMobile: true,
+            render: (val: unknown) => maskTelefone((val as string) || '') || '—'
+        },
+        {
+            key: 'departamento',
+            header: 'Departamento',
+            hiddenOnMobile: true,
+            render: (val: unknown) => (val as string) || '—'
+        },
+        {
+            key: 'ativo',
+            header: 'Status',
+            align: 'center',
+            cellVariant: 'none',
+            render: (val: unknown) => <Badge status={val ? 'ATIVA' : 'CANCELADA'} />
+        },
+        {
+            key: 'acoes',
+            header: 'Ações',
+            align: 'center',
+            cellVariant: 'none',
+            width: '120px',
+            render: (_: unknown, row: any) => (
+                <div className="inline-flex items-center gap-1 justify-end">
+                    <ActionButton icon="key-round" theme="orange" title="Resetar Senha" onClick={() => handleResetSenha(row.id, row.nome)} />
+                    <ActionButton icon="edit-2" theme="indigo" title="Editar" onClick={() => openEdit(row)} />
+                    <ActionButton icon="trash-2" theme="rose" title="Deletar" onClick={() => setDeleteTarget(row)} />
+                </div>
+            )
+        }
+    ];
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-[#4E3205]">Usuários</h1>
-                    <p className="text-gray-500 mt-1">Gerencie os usuários e permissões do sistema</p>
-                </div>
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-[#F37137] text-white rounded-lg hover:bg-[#d95f27] transition-colors shadow-sm">
-                    <Plus size={20} /> <span>Novo Usuário</span>
-                </button>
-            </div>
+            <PageHeader 
+                title="Usuários" 
+                subtitle="Gerencie os usuários e permissões do sistema" 
+            />
 
-            <div className="flex items-center gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input placeholder="Buscar por nome ou email..." value={busca} onChange={e => setBusca(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-[#F37137] focus:border-[#F37137]" />
-                </div>
-                <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-                    className="text-sm border border-gray-200 rounded-lg px-3 py-2">
-                    <option value="">Todas as roles</option>
-                    <option value="ADMIN">Admin</option><option value="GESTOR">Gestor</option>
-                    <option value="OPERADOR">Operador</option><option value="VISUALIZADOR">Visualizador</option>
-                </select>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                {loading ? <TableSkeleton rows={5} cols={7} /> : usuarios.length === 0 ? (
-                    <EmptyState icon={<UsersIcon className="w-8 h-8 text-gray-400" />} title="Nenhum usuário encontrado" />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 border-b border-gray-200">
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Nome</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Email</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Role</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">CPF</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Telefone</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Departamento</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Status</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205]">Último Login</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-[#4E3205] text-right">Ações</th>
-                            </tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {usuarios.map((u: any) => (
-                                    <tr key={u.id} className="hover:bg-[#F37137]/5 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-[#F37137] flex items-center justify-center text-white text-sm font-bold">{u.nome?.charAt(0)}</div>
-                                                <span className="font-medium text-[#4E3205]">{u.nome}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
-                                        <td className="px-6 py-4"><Badge status={u.role} /></td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{formatCpf(u.cpf || '') || '—'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{maskTelefone(u.telefone || '') || '—'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{u.departamento || '—'}</td>
-                                        <td className="px-6 py-4"><Badge status={u.ativo ? 'ATIVA' : 'CANCELADA'} /></td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{formatDate(u.ultimoLogin)}</td>
-                                        <td className="px-6 py-4 text-right space-x-1">
-                                            <button onClick={() => handleResetSenha(u.id, u.nome)} className="p-2 text-gray-400 hover:text-amber-500 rounded-lg hover:bg-white transition-colors" title="Resetar Senha">
-                                                <KeyRound size={16} /></button>
-                                            <button onClick={() => openEdit(u)} className="p-2 text-gray-400 hover:text-[#F37137] rounded-lg hover:bg-white transition-colors"><Edit2 size={16} /></button>
-                                            <button onClick={() => setDeleteTarget(u)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-white transition-colors"><Trash2 size={16} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            <DataTable
+                data={usuarios}
+                columns={columns}
+                rowKey="id"
+                loading={loading}
+                emptyMessage="Nenhum usuário encontrado"
+                emptyIcon={<UsersIcon className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+                afterSearch={
+                    usuarios.length === 0 && !loading && !busca.trim() ? (
+                        <div className="flex justify-center -mt-4">
+                            <Button onClick={openCreate} leftIcon={<Plus size={18} />}>Criar primeiro usuário</Button>
+                        </div>
+                    ) : undefined
+                }
+                searchPlaceholder="Buscar por nome ou email..."
+                searchValue={busca}
+                onSearchChange={setBusca}
+                actionButton={
+                    <div className="flex items-center gap-2">
+                        <Select value={filterRole || 'ALL'} onValueChange={(val) => setFilterRole(val === 'ALL' ? '' : val)}>
+                            <SelectTrigger className="w-48 h-12">
+                                <SelectValue placeholder="Todas as roles" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">Todas as roles</SelectItem>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                <SelectItem value="GESTOR">Gestor</SelectItem>
+                                <SelectItem value="OPERADOR">Operador</SelectItem>
+                                <SelectItem value="VISUALIZADOR">Visualizador</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={openCreate} leftIcon={<Plus size={18} />} size="lg">
+                            Novo Usuário
+                        </Button>
                     </div>
-                )}
-            </div>
+                }
+                labels={{
+                    showingPrefix: 'Mostrando',
+                    showingResults: 'usuários',
+                }}
+            />
 
             <FormModal 
                 open={isModalOpen} 
@@ -173,44 +239,61 @@ export const Usuarios = () => {
                 onConfirm={handleSave}
                 footer={
                     <>
-                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
                         <Button variant="primary" onClick={handleSave} isLoading={saving}>Salvar</Button>
                     </>
                 }
             >
-                <div className="space-y-4">
-                    {error && <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700 rounded">{error}</div>}
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Nome</label>
-                        <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
+                <div className="space-y-5 pt-2">
+                    <FormField label="Nome" required>
+                        <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome completo" />
+                    </FormField>
+                    
                     {!editingUser && (
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Email</label>
-                            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
+                        <FormField label="E-mail" required hint="O e-mail será usado para o login e não pode ser alterado depois.">
+                            <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@saritur.com.br" />
+                        </FormField>
                     )}
+                    
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">CPF</label>
-                            <input 
+                        <FormField label="CPF">
+                            <Input 
                                 value={maskCpf(form.cpf)} 
                                 onChange={e => setForm({ ...form, cpf: e.target.value })} 
                                 placeholder="000.000.000-00" 
                                 disabled={!!editingUser}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-500" /></div>
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Telefone</label>
-                            <input 
+                            />
+                        </FormField>
+                        <FormField label="Telefone">
+                            <Input 
                                 value={maskTelefone(form.telefone)} 
                                 onChange={e => setForm({ ...form, telefone: e.target.value })} 
                                 placeholder="(00) 00000-0000" 
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
+                            />
+                        </FormField>
                     </div>
-                    <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Role</label>
-                        <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                            <option value="ADMIN">Admin</option><option value="GESTOR">Gestor</option>
-                            <option value="OPERADOR">Operador</option><option value="VISUALIZADOR">Visualizador</option>
-                        </select></div>
+                    
+                    <FormField label="Role no Sistema" required>
+                        <Select value={form.role} onValueChange={(val) => setForm({ ...form, role: val })}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                <SelectItem value="GESTOR">Gestor</SelectItem>
+                                <SelectItem value="OPERADOR">Operador</SelectItem>
+                                <SelectItem value="VISUALIZADOR">Visualizador</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </FormField>
+                    
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Departamento</label>
-                            <input value={form.departamento} onChange={e => setForm({ ...form, departamento: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
-                        <div><label className="block text-sm font-medium text-[#4E3205] mb-1">Cargo</label>
-                            <input value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></div>
+                        <FormField label="Departamento">
+                            <Input value={form.departamento} onChange={e => setForm({ ...form, departamento: e.target.value })} placeholder="Ex: TI, RH..." />
+                        </FormField>
+                        <FormField label="Cargo">
+                            <Input value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} placeholder="Ex: Analista..." />
+                        </FormField>
                     </div>
                 </div>
             </FormModal>
@@ -218,21 +301,26 @@ export const Usuarios = () => {
             <FormModal 
                 open={!!senhaModal} 
                 onOpenChange={(op) => { if(!op) setSenhaModal(null); }} 
-                title="Senha Temporária" 
+                title="Credenciais de Acesso" 
                 maxWidth="sm"
-                footer={<Button variant="primary" onClick={() => setSenhaModal(null)}>Entendi</Button>}
+                footer={<Button variant="primary" onClick={() => setSenhaModal(null)} className="w-full">Entendi</Button>}
             >
-                <div className="text-center space-y-4">
-                    <p className="text-sm text-gray-600">Senha gerada para <strong>{senhaModal?.user?.nome}</strong>:</p>
-                    <div className="bg-gray-100 rounded-xl p-4 font-mono text-lg text-[#4E3205] select-all">{senhaModal?.senha}</div>
-                    <p className="text-xs text-amber-600">⚠️ Copie esta senha agora. Ela não será exibida novamente.</p>
-                    
-                    <div className="flex items-center gap-2 mt-3 p-3 bg-emerald-50 rounded-xl text-left">
-                        <Mail className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        <p className="text-xs text-emerald-700 m-0">
-                            Um email com esses dados de acesso também foi enviado para <strong>{senhaModal?.user?.email || senhaModal?.user?.nome}</strong>.
-                        </p>
-                    </div>
+                <div className="space-y-6 pt-2">
+                    <SimpleInfoCard 
+                        title="Senha Gerada" 
+                        value={senhaModal?.senha} 
+                        variant="yellow" 
+                        align="center"
+                        subtext="⚠️ Copie a senha agora, não será exibida novamente."
+                    />
+
+                    <SimpleInfoCard 
+                        title="E-mail Enviado" 
+                        value="Sucesso" 
+                        variant="green" 
+                        align="center"
+                        subtext={`Enviado para ${senhaModal?.user?.email || senhaModal?.user?.nome}`}
+                    />
                 </div>
             </FormModal>
 

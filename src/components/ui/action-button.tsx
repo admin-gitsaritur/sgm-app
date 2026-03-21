@@ -1,5 +1,6 @@
 import { LucideIcon, icons } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipTrigger, TooltipContent } from "./tooltip"
 
 // ============================================================================
 // COMPONENTE ICON
@@ -48,17 +49,7 @@ interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 
 /**
  * Botão de ação para tabelas com ícone e tema de cor.
- * 
- * @param icon - Nome do ícone Lucide (ex: "pencil", "trash-2")
- * @param theme - Tema de cor:
- *   - sky: Visualizar (azul claro)
- *   - indigo: Editar (azul escuro)
- *   - emerald: Vincular (verde)
- *   - orange: Desvincular (laranja)
- *   - violet: Gestão (roxo)
- *   - rose: Deletar (vermelho)
- *   - stone: Padrão/Mais opções (cinza)
- * @param title - Tooltip do botão
+ * Usa Tooltip estilizado (glassmorphism) em vez do title nativo do browser.
  */
 export function ActionButton({
     icon,
@@ -77,18 +68,30 @@ export function ActionButton({
         stone: "hover:text-brown hover:bg-stone-100"      // Padrão/Mais
     }
 
-    return (
+    const btn = (
         <button
             className={cn(
                 "w-9 h-9 flex items-center justify-center rounded-xl text-stone-400 transition-all duration-200",
                 themeClasses[theme],
                 className
             )}
-            title={title}
             {...props}
         >
             <Icon name={icon} size={18} />
         </button>
+    )
+
+    if (!title) return btn
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {btn}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="!px-3 !py-1.5">
+                {title}
+            </TooltipContent>
+        </Tooltip>
     )
 }
 

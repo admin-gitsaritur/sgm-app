@@ -12,22 +12,25 @@ Sistema web para gestão estratégica de metas, projetos e indicadores da Saritu
 src/
 ├── components/
 │   ├── ui/               # Componentes globais reutilizáveis
-│   │   ├── ActionButton   # Botão de ação com tooltip e ícone
-│   │   ├── Button         # Botão padrão com variantes
-│   │   ├── CellText       # Texto de célula de tabela
-│   │   ├── CurrencyInput  # Input com máscara de moeda BRL (R$)
-│   │   ├── DataTable      # Tabela de dados com sorting e busca
-│   │   ├── DropdownMenu   # Menu dropdown (Radix UI)
-│   │   ├── FormField      # Campo de formulário com label
-│   │   ├── IconBadge      # Badge com ícone
-│   │   ├── Input          # Input padrão
-│   │   ├── Modal          # Modal com ESC/Enter
-│   │   ├── PageHeader     # Header de página
-│   │   ├── ProgressBar    # Barra de progresso
-│   │   ├── Select         # Select dropdown (Radix UI)
-│   │   ├── Spinner        # Loading spinner
-│   │   ├── Toast          # Toast notifications (sonner)
-│   │   └── UserAvatar     # Avatar do usuário
+│   │   ├── ActionButton     # Botão de ação com tooltip e ícone
+│   │   ├── Button           # Botão padrão com variantes
+│   │   ├── Calendar         # Calendário (react-day-picker)
+│   │   ├── CellText         # Texto de célula de tabela
+│   │   ├── CurrencyInput    # Input com máscara de moeda BRL (R$)
+│   │   ├── DataTable        # Tabela de dados com sorting, busca e paginação
+│   │   ├── DateRangeInline  # Seletor de intervalo de datas com popover
+│   │   ├── DropdownMenu     # Menu dropdown (Radix UI)
+│   │   ├── FormField        # Campo de formulário com label
+│   │   ├── IconBadge        # Badge com ícone
+│   │   ├── Input            # Input padrão
+│   │   ├── Modal            # Modal com ESC/Enter
+│   │   ├── PageHeader       # Header de página
+│   │   ├── Popover          # Popover (Radix UI)
+│   │   ├── ProgressBar      # Barra de progresso
+│   │   ├── Select           # Select dropdown (Radix UI)
+│   │   ├── Spinner          # Loading spinner
+│   │   ├── Toast            # Toast notifications (sonner)
+│   │   └── UserAvatar       # Avatar do usuário
 │   ├── ConfirmDialog.tsx  # Dialog de confirmação
 │   ├── ErrorBoundary.tsx  # Error boundary global
 │   └── Layout.tsx         # Layout principal com sidebar
@@ -40,7 +43,7 @@ src/
 │   ├── Responsaveis.tsx   # Gestão de responsáveis
 │   ├── Relatorios.tsx     # Relatórios
 │   ├── Usuarios.tsx       # Gestão de usuários
-│   ├── Auditoria.tsx      # Log de auditoria
+│   ├── Auditoria.tsx      # Log de auditoria com DataTable e filtros
 │   ├── Configuracoes.tsx  # Configurações do sistema
 │   ├── Login.tsx          # Login
 │   ├── TrocarSenha.tsx    # Troca de senha obrigatória
@@ -59,8 +62,10 @@ src/
 | Framework | React 18 + TypeScript |
 | Build | Vite |
 | Estilização | Tailwind CSS + Design tokens |
-| Componentes | Radix UI (Select, Dialog, Tooltip, Dropdown) |
+| Componentes | Radix UI (Select, Dialog, Tooltip, Dropdown, Popover) |
+| Calendário | react-day-picker + date-fns (locale ptBR) |
 | Ícones | Lucide React |
+| Animações | Framer Motion |
 | Toasts | Sonner |
 | Flow/Mapa | @xyflow/react (React Flow) |
 | Estado | Zustand |
@@ -124,7 +129,8 @@ npm run build
 - **Cores primárias:** Laranja Saritur (`#F37137`) e Marrom (`#4E3205`)
 - **Tipografia:** Sora (Google Fonts)
 - **Componentes:** Baseados em Radix UI com estilos customizados
-- **Padrão:** Todos os componentes são globais, reutilizáveis e sem hardcodes
+- **Padrão Gold Master:** Baseado na página `/metas` — todas as páginas seguem o mesmo padrão
+- **Regra:** Todos os componentes são globais, reutilizáveis e sem hardcodes
 
 ## 📄 Licença
 

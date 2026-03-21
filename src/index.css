@@ -223,6 +223,11 @@
     box-shadow: 0 10px 40px -6px rgba(78, 50, 5, 0.08), 0 4px 12px -4px rgba(0, 0, 0, 0.04);
   }
 
+  /* Dropdown/Popover shadow — sutil, escura, sem glow */
+  .dropdown-shadow {
+    box-shadow: 0 8px 30px -4px rgba(78, 50, 5, 0.10), 0 4px 10px -4px rgba(0, 0, 0, 0.06);
+  }
+
   /* ══════════════════════════════════════════════════════════════
      GLASSMORPHISM SCROLLBAR — Universal System Scrollbar
      ══════════════════════════════════════════════════════════════ */

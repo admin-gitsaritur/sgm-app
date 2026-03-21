@@ -116,9 +116,9 @@ export const Projetos = () => {
       align: 'center' as const,
       cellVariant: 'none' as const,
       render: (val: unknown) => (
-        <DataTableBadge color="gray">
+        <CellText variant="muted">
           {((val as number) / 100).toFixed(1)}%
-        </DataTableBadge>
+        </CellText>
       ),
     },
     {
@@ -196,7 +196,7 @@ export const Projetos = () => {
   // ── Render ──
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-6">
 
       {/* ── Header ── */}
       <PageHeader
@@ -214,7 +214,18 @@ export const Projetos = () => {
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
         emptyMessage="Nenhum projeto encontrado"
-        emptyIcon={<Briefcase className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+        emptyIcon={
+          <div className="flex flex-col items-center gap-4">
+            <Briefcase className="h-16 w-16 opacity-30 text-stone-400" />
+          </div>
+        }
+        afterSearch={
+          filteredProjetos.length === 0 && !loading && !search.trim() ? (
+            <div className="flex justify-center -mt-4">
+              <Button onClick={openCreate} leftIcon={<Plus size={18} />}>Criar primeiro projeto</Button>
+            </div>
+          ) : undefined
+        }
         searchPlaceholder="Buscar projetos..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -283,7 +294,7 @@ export const Projetos = () => {
       </Modal>
 
       <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-        title="Excluir Projeto" message={`Deseja excluir "${deleteTarget?.nome}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" />
+        title="Excluir Projeto" description={`Deseja excluir "${deleteTarget?.nome}"? Esta ação não pode ser desfeita.`} confirmText="Excluir" />
     </div>
   );
 };

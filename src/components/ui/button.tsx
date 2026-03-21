@@ -31,12 +31,12 @@ const buttonVariants = cva(
 
         // Secondary (Outline)
         secondary: `bg-white border border-stone-200 text-stone-600 shadow-sm
-                           hover:bg-stone-50 hover:text-primary hover:border-primary/30
+                           hover:bg-stone-50 hover:text-stone-800 hover:border-stone-300
                            active:bg-stone-100`,
 
         // Outline (Alias para Secondary - compatibilidade com shadcn/ui)
         outline: `bg-white border border-stone-200 text-stone-600 shadow-sm
-                           hover:bg-stone-50 hover:text-primary hover:border-primary/30
+                           hover:bg-stone-50 hover:text-stone-800 hover:border-stone-300
                            active:bg-stone-100`,
 
         // Ghost (Text Only)

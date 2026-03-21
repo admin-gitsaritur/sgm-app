@@ -13,6 +13,7 @@ import { ActionButton } from '../components/ui/action-button';
 import { ProgressBar } from '../components/ui/progress-bar';
 import { PageHeader } from '../components/ui/PageHeader';
 import { FormField } from '../components/ui/FormField';
+import { FormSection } from '../components/ui/FormSection';
 import { CurrencyInput } from '../components/ui/CurrencyInput';
 import { IconBadge } from '../components/ui/IconBadge';
 import { CellText } from '../components/ui/CellText';
@@ -21,6 +22,7 @@ import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Plus, Gauge, Calendar, DollarSign, Percent, Hash } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 // ── Constantes ────────────────────────────────────────────
 
@@ -162,12 +164,19 @@ export const Metas = () => {
       key: 'valorMetaCentavos',
       header: 'Valor',
       align: 'center' as const,
-      render: (val: unknown, row: any) => formatValue(val as number, row.unidadeMeta),
+      cellVariant: 'none' as const,
+      render: (val: unknown, row: any) => (
+        <CellText variant="muted">{formatValue(val as number, row.unidadeMeta)}</CellText>
+      ),
     },
     {
       key: 'ano',
       header: 'Ano',
       align: 'center' as const,
+      cellVariant: 'none' as const,
+      render: (val: unknown) => (
+        <CellText variant="muted">{String(val)}</CellText>
+      ),
     },
     {
       key: 'periodoInicio',
@@ -177,7 +186,7 @@ export const Metas = () => {
       cellVariant: 'none' as const,
       render: (_: unknown, row: any) => (
         <CellText variant="muted">
-          {row.periodoInicio ? format(new Date(row.periodoInicio), 'dd/MM/yy') : '—'} – {row.periodoFim ? format(new Date(row.periodoFim), 'dd/MM/yy') : '—'}
+          {row.periodoInicio ? format(new Date(row.periodoInicio), 'MMM/yyyy', { locale: ptBR }) : '—'} – {row.periodoFim ? format(new Date(row.periodoFim), 'MMM/yyyy', { locale: ptBR }) : '—'}
         </CellText>
       ),
     },
@@ -188,9 +197,9 @@ export const Metas = () => {
       hiddenOnMobile: true,
       cellVariant: 'none' as const,
       render: (val: unknown) => (
-        <DataTableBadge color="gray">
+        <span className="text-sm text-stone-500">
           {PERIODICIDADE_LABELS[val as string] || String(val)}
-        </DataTableBadge>
+        </span>
       ),
     },
     {
@@ -324,7 +333,7 @@ export const Metas = () => {
   // ── Render ──
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-6">
 
       {/* ── Header ── */}
       <PageHeader
@@ -350,7 +359,18 @@ export const Metas = () => {
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
         emptyMessage="Nenhuma meta cadastrada"
-        emptyIcon={<Gauge className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+        emptyIcon={
+          <div className="flex flex-col items-center gap-4">
+            <Gauge className="h-16 w-16 opacity-30 text-stone-400" />
+          </div>
+        }
+        afterSearch={
+          filteredMetas.length === 0 && !loading && !search.trim() ? (
+            <div className="flex justify-center -mt-4">
+              <Button onClick={openCreate} leftIcon={<Plus size={18} />}>Criar primeira meta</Button>
+            </div>
+          ) : undefined
+        }
         searchPlaceholder="Buscar metas..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -371,6 +391,7 @@ export const Metas = () => {
         onClose={() => setIsModalOpen(false)}
         title={editingMeta ? 'Editar Meta' : 'Nova Meta'}
         size="lg"
+        onConfirm={handleSave}
         footer={
           <>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
@@ -446,7 +467,7 @@ export const Metas = () => {
           </div>
 
           {form.tipoCurva === 'PERSONALIZADA' && (
-           <div className="space-y-3 bg-stone-50 rounded-xl p-4 border border-stone-100">
+           <FormSection>
               <ProgressBar
                 value={progressoCurva}
                 color={Math.abs(progressoCurva - 100) < 0.01 ? 'bg-emerald-500' : progressoCurva > 100 ? 'bg-rose-500' : 'bg-amber-500'}
@@ -464,13 +485,13 @@ export const Metas = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </FormSection>
           )}
         </div>
       </Modal>
 
       <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-        title="Excluir Meta" message={`Deseja excluir "${deleteTarget?.nome}"? Projetos vinculados impedirão a exclusão.`} confirmLabel="Excluir" />
+        title="Excluir Meta" description={`Deseja excluir "${deleteTarget?.nome}"? Projetos vinculados impedirão a exclusão.`} confirmText="Excluir" />
     </div>
   );
 };

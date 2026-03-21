@@ -256,9 +256,9 @@ export const Indicadores = () => {
       align: 'center' as const,
       cellVariant: 'none' as const,
       render: (val: unknown) => (
-        <DataTableBadge color="gray">
+        <CellText variant="muted">
           {((val as number) * 100).toFixed(0)}%
-        </DataTableBadge>
+        </CellText>
       ),
     },
     {
@@ -355,7 +355,18 @@ export const Indicadores = () => {
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
         emptyMessage="Nenhum indicador encontrado"
-        emptyIcon={<BarChart2 className="h-16 w-16 mb-4 opacity-30 text-stone-400" />}
+        emptyIcon={
+          <div className="flex flex-col items-center gap-4">
+            <BarChart2 className="h-16 w-16 opacity-30 text-stone-400" />
+          </div>
+        }
+        afterSearch={
+          filteredIndicadores.length === 0 && !loading && !search.trim() ? (
+            <div className="flex justify-center -mt-4">
+              <Button onClick={openCreate} leftIcon={<Plus size={18} />}>Criar primeiro indicador</Button>
+            </div>
+          ) : undefined
+        }
         searchPlaceholder="Buscar indicadores..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -568,14 +579,13 @@ export const Indicadores = () => {
         </div>
       </Modal>
 
-      {/* ── Confirm Delete ── */}
       <ConfirmDialog
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir Indicador"
-        message={`Deseja excluir "${deleteTarget?.nome}"?`}
-        confirmLabel="Excluir"
+        description={`Deseja excluir "${deleteTarget?.nome}"?`}
+        confirmText="Excluir"
       />
     </div>
   );

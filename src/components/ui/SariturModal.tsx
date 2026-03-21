@@ -37,7 +37,7 @@
  */
 
 import * as React from "react"
-import { X } from "lucide-react"
+import { X, AlertTriangle, CheckCircle2, Info } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "./button"
 import {
@@ -101,26 +101,34 @@ const MAX_WIDTH_MAP: Record<string, string> = {
     "60vw": "sm:w-[60vw] sm:max-w-[60vw]",
 }
 
+/** Ícone padrão por tipo de alerta (Lucide) */
+const ALERT_ICONS: Record<string, React.ReactNode> = {
+    danger:  <AlertTriangle className="w-5 h-5" />,
+    warning: <AlertTriangle className="w-5 h-5" />,
+    success: <CheckCircle2 className="w-5 h-5" />,
+    info:    <Info className="w-5 h-5" />,
+}
+
 const ALERT_CONFIG = {
     danger: {
         iconBg: "bg-rose-50 border-rose-100",
         iconColor: "text-rose-600",
-        buttonVariant: "destructive" as const,
+        confirmVariant: "danger" as const,
     },
     warning: {
         iconBg: "bg-amber-50 border-amber-100",
         iconColor: "text-amber-600",
-        buttonVariant: "outline" as const,
+        confirmVariant: "warning" as const,
     },
     success: {
         iconBg: "bg-emerald-50 border-emerald-100",
         iconColor: "text-emerald-600",
-        buttonVariant: "default" as const,
+        confirmVariant: "success" as const,
     },
     info: {
         iconBg: "bg-blue-50 border-blue-100",
         iconColor: "text-blue-600",
-        buttonVariant: "default" as const,
+        confirmVariant: "default" as const,
     },
 }
 
@@ -174,7 +182,7 @@ export function FormModal({
                 className={cn("p-0 gap-0 rounded-2xl border-stone-100 overflow-hidden", MAX_WIDTH_MAP[maxWidth])}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-[#eeedea]">
                     <div>
                         <DialogTitle className="text-lg font-bold text-brown">{title}</DialogTitle>
                         {description && (
@@ -195,7 +203,7 @@ export function FormModal({
 
                 {/* Footer */}
                 {footer && (
-                    <div className="px-6 py-5 bg-stone-50 border-t border-stone-100 flex justify-end gap-3">
+                    <div className="px-6 py-5 bg-stone-50 border-t border-[#eeedea] flex justify-end gap-3">
                         {footer}
                     </div>
                 )}
@@ -205,7 +213,7 @@ export function FormModal({
 }
 
 // ============================================================================
-// ALERT MODAL
+// ALERT MODAL — Glassmorphism + Filled Buttons
 // ============================================================================
 
 export function AlertModal({
@@ -222,19 +230,40 @@ export function AlertModal({
 }: AlertModalProps) {
     const config = ALERT_CONFIG[type]
 
+    // Enter confirma ação
+    React.useEffect(() => {
+        if (!open || !onConfirm) return
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== "Enter") return
+            if (e.shiftKey || e.ctrlKey || e.metaKey) return
+            e.preventDefault()
+            onConfirm()
+            if (type === "success" || type === "info") onOpenChange(false)
+        }
+        document.addEventListener("keydown", handleKeyDown)
+        return () => document.removeEventListener("keydown", handleKeyDown)
+    }, [open, onConfirm, onOpenChange, type])
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showCloseButton={false} className="p-0 gap-0 rounded-2xl border-stone-100 max-w-[440px]">
+            <DialogContent
+                showCloseButton={false}
+                className="p-0 gap-0 rounded-2xl max-w-[440px] border-white/30 bg-white/85 backdrop-blur-xl"
+            >
                 <DialogHeader className="sr-only">
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{typeof message === 'string' ? message : 'Confirmação de ação'}</DialogDescription>
                 </DialogHeader>
 
-                <div className="p-6 flex flex-col gap-6 bg-white">
+                <div className="p-6 flex flex-col gap-5 bg-white rounded-t-2xl">
+                    {/* Icon + Text */}
                     <div className="flex gap-4 items-start">
-                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border shrink-0", config.iconBg)}>
+                        <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center border shrink-0",
+                            config.iconBg
+                        )}>
                             <span className={config.iconColor}>
-                                {icon || <span className="w-6 h-6 flex items-center justify-center font-bold text-lg">!</span>}
+                                {icon || ALERT_ICONS[type]}
                             </span>
                         </div>
                         <div className="flex-1 pt-1">
@@ -242,21 +271,28 @@ export function AlertModal({
                             <div className="text-sm text-stone-500 leading-relaxed">{message}</div>
                         </div>
                     </div>
-                    <div className="flex justify-end gap-3 pt-2">
-                        {type !== "success" && type !== "info" && (
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>{cancelText}</Button>
-                        )}
+                </div>
+
+                {/* Footer — tom diferente */}
+                <div className="px-6 py-4 bg-stone-50/80 border-t border-[#eeedea] flex justify-end gap-3 rounded-b-2xl">
+                    {type !== "success" && type !== "info" && (
                         <Button
-                            variant={config.buttonVariant}
-                            onClick={() => {
-                                onConfirm?.()
-                                if (type === "success" || type === "info") onOpenChange(false)
-                            }}
-                            isLoading={isLoading}
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
                         >
-                            {confirmText}
+                            {cancelText}
                         </Button>
-                    </div>
+                    )}
+                    <Button
+                        variant={config.confirmVariant}
+                        onClick={() => {
+                            onConfirm?.()
+                            if (type === "success" || type === "info") onOpenChange(false)
+                        }}
+                        isLoading={isLoading}
+                    >
+                        {confirmText}
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>
