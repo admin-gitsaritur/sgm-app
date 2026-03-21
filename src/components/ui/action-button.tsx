@@ -18,9 +18,20 @@ interface IconProps {
  * @param size - Tamanho em pixels (padrão: 18)
  * @param className - Classes CSS adicionais
  */
+// Alias map para ícones renomeados entre versões do lucide-react
+const ICON_ALIASES: Record<string, string> = {
+    "edit-2": "pencil",
+    "edit-3": "pencil-line",
+    "edit": "square-pen",
+    "trash": "trash-2",
+}
+
 export function Icon({ name, size = 18, className }: IconProps) {
+    // Resolve aliases primeiro
+    const resolvedName = ICON_ALIASES[name] || name
+
     // Converte nome kebab-case para PascalCase
-    const lucideName = name
+    const lucideName = resolvedName
         .split("-")
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join("")
@@ -28,7 +39,7 @@ export function Icon({ name, size = 18, className }: IconProps) {
     const LucideIconComponent = (icons as Record<string, LucideIcon>)[lucideName]
 
     if (!LucideIconComponent) {
-        console.warn(`Icon "${name}" not found in lucide-react`)
+        console.warn(`Icon "${name}" (resolved: "${resolvedName}") not found in lucide-react`)
         return null
     }
 

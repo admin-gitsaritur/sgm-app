@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeleton';
 import { Users as UsersIcon, Plus } from 'lucide-react';
 import { maskCpf, maskTelefone, formatCpf } from '../lib/masks';
-import { toast } from 'sonner';
+import { toast } from '../components/ui/toast';
 
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/input';
@@ -43,7 +43,7 @@ export const Usuarios = () => {
             const res = await api(`/usuarios?${params.toString()}`);
             if (res.success) setUsuarios(res.data);
         } catch (err: any) { 
-            toast.error(err.message || 'Erro ao carregar usuários');
+            toast.error({ title: 'Erro ao carregar', description: err.message || 'Erro ao carregar usuários' });
         } finally { 
             setLoading(false); 
         }
@@ -61,23 +61,39 @@ export const Usuarios = () => {
         setIsModalOpen(true);
     };
 
+    // Valida se CPF está completo (###.###.###-##)
+    const sanitizeCpf = (cpf: string): string | null => {
+        if (!cpf) return null;
+        const digits = cpf.replace(/\D/g, '');
+        if (digits.length !== 11) return null;
+        return maskCpf(cpf);
+    };
+
+    // Valida se telefone está completo ((##) #####-#### ou (##) ####-####)
+    const sanitizeTelefone = (tel: string): string | null => {
+        if (!tel) return null;
+        const digits = tel.replace(/\D/g, '');
+        if (digits.length < 10) return null;
+        return maskTelefone(tel);
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
             if (editingUser) {
                 const { email, cpf, telefone, ...body } = form;
-                const bodyToSend = { ...body, telefone: telefone ? telefone : null };
+                const bodyToSend = { ...body, telefone: sanitizeTelefone(telefone) };
                 await api(`/usuarios/${editingUser.id}`, { method: 'PUT', body: JSON.stringify(bodyToSend) });
-                toast.success('Usuário atualizado com sucesso');
+                toast.success({ title: 'Usuário atualizado', description: 'As alterações foram salvas com sucesso.' });
                 setIsModalOpen(false);
             } else {
                 const bodyToSend = { 
                     ...form, 
-                    cpf: form.cpf ? form.cpf : null, 
-                    telefone: form.telefone ? form.telefone : null 
+                    cpf: sanitizeCpf(form.cpf), 
+                    telefone: sanitizeTelefone(form.telefone) 
                 };
                 const res = await api('/usuarios', { method: 'POST', body: JSON.stringify(bodyToSend) });
-                toast.success('Usuário criado com sucesso');
+                toast.success({ title: 'Usuário criado', description: `${form.nome} foi adicionado ao sistema.` });
                 setIsModalOpen(false);
                 if (res.data?.senhaTemporaria) {
                     setSenhaModal({ user: form, senha: res.data.senhaTemporaria });
@@ -85,7 +101,7 @@ export const Usuarios = () => {
             }
             fetchData();
         } catch (err: any) { 
-            toast.error(err.message || 'Erro ao salvar usuário');
+            toast.error({ title: 'Erro ao salvar', description: err.message || 'Não foi possível salvar o usuário.' });
         } finally { 
             setSaving(false); 
         }
@@ -96,10 +112,10 @@ export const Usuarios = () => {
             const res = await api(`/usuarios/${userId}/reset-senha`, { method: 'POST' });
             if (res.data?.senhaTemporaria) {
                 setSenhaModal({ user: { nome: userName }, senha: res.data.senhaTemporaria });
-                toast.success('Senha resetada com sucesso');
+                toast.success({ title: 'Senha resetada', description: `Nova senha gerada para ${userName}.` });
             }
         } catch (err: any) { 
-            toast.error(err.message || 'Erro ao resetar senha');
+            toast.error({ title: 'Erro ao resetar', description: err.message || 'Não foi possível resetar a senha.' });
         }
     };
 
@@ -107,12 +123,12 @@ export const Usuarios = () => {
         if (!deleteTarget) return;
         try { 
             await api(`/usuarios/${deleteTarget.id}`, { method: 'DELETE' }); 
-            toast.success('Usuário desativado com sucesso');
+            toast.success({ title: 'Usuário desativado', description: `${deleteTarget?.nome} foi desativado do sistema.` });
             setDeleteTarget(null); 
             fetchData(); 
         }
         catch (err: any) { 
-            toast.error(err.message || 'Erro ao desativar usuário');
+            toast.error({ title: 'Erro ao desativar', description: err.message || 'Não foi possível desativar o usuário.' });
         }
     };
 
