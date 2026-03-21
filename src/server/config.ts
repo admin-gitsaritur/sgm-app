@@ -36,4 +36,12 @@ export const config = {
     // Google OAuth
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+
+    // MinIO (S3 Compatible Storage)
+    minioEndpoint: process.env.MINIO_ENDPOINT || 's3.saritur.com.br',
+    minioPort: parseInt(process.env.MINIO_PORT || '443', 10),
+    minioAccessKey: process.env.MINIO_ACCESS_KEY || '',
+    minioSecretKey: process.env.MINIO_SECRET_KEY || '',
+    minioBucket: process.env.MINIO_BUCKET || 'saritur-sgm',
+    minioUseSsl: process.env.MINIO_USE_SSL === 'true',
 };

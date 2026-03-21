@@ -74,19 +74,25 @@ export function buildEmailHtml(options: {
   // ── Bloco: Detalhes (caixa cinza) ──
   const detailsHtml = options.details
     ? `<div style="background-color:${colors.bgDetails};border:1px solid ${colors.borderLight};border-radius:${layout.borderRadiusInner};padding:24px;margin-bottom:32px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
         ${options.details.map((d, i) => {
           const isLast = i === options.details!.length - 1;
           const rowStyle = isLast
-            ? `display:flex;justify-content:space-between;padding-top:16px;border-top:1px dashed ${colors.borderMedium};font-weight:600;font-size:16px;color:${colors.textPrimary};`
-            : 'display:flex;justify-content:space-between;margin-bottom:16px;font-size:14px;';
+            ? `padding-top:16px;border-top:1px dashed ${colors.borderMedium};`
+            : 'padding-bottom:16px;';
+          const labelStyle = `display:block;color:${colors.textMuted};font-size:14px;margin-bottom:6px;`;
           const valueStyle = d.highlight
-            ? `font-weight:600;color:${colors.textHighlight};text-align:right;`
-            : `color:${colors.textPrimary};font-weight:400;text-align:right;`;
-          return `<div style="${rowStyle}">
-            <span style="color:${colors.textMuted};">${d.label}</span>
-            <span style="${valueStyle}">${d.value}</span>
-          </div>`;
+            ? `display:block;font-weight:700;color:${colors.textHighlight};font-size:18px;letter-spacing:1px;`
+            : `display:block;color:${colors.textPrimary};font-weight:500;font-size:15px;`;
+            
+          return `<tr>
+            <td align="center" style="${rowStyle}">
+              <span style="${labelStyle}">${d.label}:</span>
+              <span style="${valueStyle}">${d.value}</span>
+            </td>
+          </tr>`;
         }).join('')}
+        </table>
       </div>`
     : '';
 
@@ -119,7 +125,7 @@ export function buildEmailHtml(options: {
 
           <!-- Header com Logo -->
           <tr>
-            <td style="padding:${layout.paddingHeader};text-align:center;background-color:${colors.bgPage};border-radius:${layout.borderRadius} ${layout.borderRadius} 0 0;border-bottom:1px solid ${colors.borderHeader};">
+            <td style="padding:${layout.paddingHeader};text-align:center;background-color:${colors.bgCard};border-radius:${layout.borderRadius} ${layout.borderRadius} 0 0;border-bottom:1px solid ${colors.borderHeader};">
               <img src="${assets.logoUrl}" alt="${brand.name}" style="max-height:48px;width:auto;" />
             </td>
           </tr>

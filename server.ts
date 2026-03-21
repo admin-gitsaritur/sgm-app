@@ -24,6 +24,7 @@ async function startServer() {
   // Security headers
   app.use(helmet({
     contentSecurityPolicy: false, // Allow inline scripts for Vite dev
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // Allow Google OAuth popup to communicate back
   }));
 
   // CORS

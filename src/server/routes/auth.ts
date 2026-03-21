@@ -85,9 +85,9 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
 
 // ── POST /google ──────────────────────────────────────────
 authRouter.post('/google', async (req, res) => {
-  const { credential } = req.body;
+  const { credential, accessToken } = req.body;
 
-  if (!credential) {
+  if (!credential && !accessToken) {
     return res.status(400).json({ success: false, error: 'Token do Google não fornecido' });
   }
 
@@ -96,21 +96,54 @@ authRouter.post('/google', async (req, res) => {
   }
 
   try {
-    // Verificar token do Google
-    const { OAuth2Client } = await import('google-auth-library');
-    const client = new OAuth2Client(config.googleClientId);
+    let email: string | undefined;
+    let name: string | undefined;
+    let googleId: string | undefined;
+    let picture: string | undefined;
 
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: config.googleClientId,
-    });
+    if (credential) {
+      // Flow 1: ID Token (GoogleLogin component / One Tap)
+      const { OAuth2Client } = await import('google-auth-library');
+      const client = new OAuth2Client(config.googleClientId);
 
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
-      return res.status(401).json({ success: false, error: 'Token do Google inválido' });
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: config.googleClientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ success: false, error: 'Token do Google inválido' });
+      }
+
+      email = payload.email;
+      name = payload.name;
+      googleId = payload.sub;
+      picture = payload.picture;
+    } else if (accessToken) {
+      // Flow 2: Access Token (useGoogleLogin implicit flow)
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!userInfoRes.ok) {
+        return res.status(401).json({ success: false, error: 'Access token do Google inválido' });
+      }
+
+      const userInfo = await userInfoRes.json() as { sub: string; email: string; name: string; picture: string };
+      if (!userInfo.email) {
+        return res.status(401).json({ success: false, error: 'Não foi possível obter e-mail da conta Google' });
+      }
+
+      email = userInfo.email;
+      name = userInfo.name;
+      googleId = userInfo.sub;
+      picture = userInfo.picture;
     }
 
-    const { email, name, sub: googleId, picture } = payload;
+    if (!email || !googleId) {
+      return res.status(401).json({ success: false, error: 'Dados do Google insuficientes' });
+    }
 
     // Buscar user por googleId ou email
     let result = await query('SELECT * FROM users WHERE "googleId" = $1 AND "deletedAt" IS NULL', [googleId]);
@@ -125,29 +158,8 @@ authRouter.post('/google', async (req, res) => {
         // Vincular Google ao user existente
         await query('UPDATE users SET "googleId" = $1, "loginProvider" = $2 WHERE id = $3', [googleId, 'google', user.id]);
       } else {
-        // Criar novo user via Google
-        const userId = crypto.randomUUID();
-        const dummyHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), config.bcryptRounds);
-
-        await query(`
-          INSERT INTO users (id, nome, email, "senhaHash", role, ativo, "criadoEm", "googleId", "loginProvider", avatar, "deveTrocarSenha")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        `, [
-          userId,
-          name || email!.split('@')[0],
-          email,
-          dummyHash,
-          'VISUALIZADOR',
-          true,
-          new Date().toISOString(),
-          googleId,
-          'google',
-          picture || null,
-          false,
-        ]);
-
-        result = await query('SELECT * FROM users WHERE id = $1', [userId]);
-        user = result.rows[0] as User;
+        // Usuário não existe, não cadastrar automaticamente
+        return res.status(401).json({ success: false, error: 'Email não cadastrado na plataforma.', code: 'USER_NOT_FOUND' });
       }
     }
 
@@ -380,9 +392,9 @@ authRouter.post('/esqueci-senha', async (req, res) => {
     const result = await query('SELECT * FROM users WHERE email = $1 AND "deletedAt" IS NULL', [email.toLowerCase().trim()]);
     const user = result.rows[0] as User | undefined;
 
-    // Sempre retornar sucesso para não expor existência de contas
+    // Verificar explicitamente se o usuário existe (a pedido do cliente)
     if (!user) {
-      return res.json({ success: true, data: { message: 'Se o email estiver cadastrado, você receberá as instruções.' } });
+      return res.status(404).json({ success: false, error: 'E-mail não encontrado na nossa base de dados.' });
     }
 
     // Gerar senha temporária
@@ -408,7 +420,7 @@ authRouter.post('/esqueci-senha', async (req, res) => {
 
     await logAudit(user.id, 'RESET_SENHA', 'User', user.id, null, null, req.ip, req.headers['user-agent']);
 
-    res.json({ success: true, data: { message: 'Se o email estiver cadastrado, você receberá as instruções.' } });
+    res.json({ success: true, data: { message: 'Instruções enviadas com sucesso.' } });
   } catch (err) {
     console.error('Erro no esqueci-senha:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });

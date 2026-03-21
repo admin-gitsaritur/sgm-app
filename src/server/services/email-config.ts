@@ -18,9 +18,9 @@ export const emailConfig = {
 
   // ── Assets ────────────────────────────────────────────
   assets: {
-    // Logo para o header do email (fundo escuro → logo branco)
+    // Logo para o header do email (Carregado do S3/MinIO)
     logoUrl: process.env.EMAIL_LOGO_URL
-      || `${config.corsOrigin}/brands/logo_saritur_branco.png`,
+      || `${config.minioUseSsl ? 'https' : 'http'}://${config.minioEndpoint}${config.minioPort === 443 || config.minioPort === 80 ? '' : ':' + config.minioPort}/${config.minioBucket}/brands/logo_saritur_branco.png`,
 
     // Favicon para clientes que suportam
     faviconUrl: process.env.EMAIL_FAVICON_URL
