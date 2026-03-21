@@ -36,10 +36,10 @@ export const emailConfig = {
     yellow: '#F6D317',        // --saritur-yellow
 
     // Backgrounds
-    bgPage: '#F7F7F9',        // Fundo geral do email
+    bgPage: '#FFFFFF',        // Fundo geral do email (branco limpo)
     bgCard: '#FFFFFF',        // Fundo do card central
     bgDetails: '#FAFAFA',     // Fundo da caixa de detalhes
-    bgFooter: '#FAFAFA',      // Fundo do rodapé
+    bgFooter: '#FFFFFF',      // Fundo do rodapé (branco)
     bgIconCircle: '#FFF3ED',  // Fundo do círculo do emoji
 
     // Textos

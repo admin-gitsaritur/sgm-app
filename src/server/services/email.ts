@@ -126,7 +126,7 @@ export function buildEmailHtml(options: {
           <!-- Header com Logo -->
           <tr>
             <td style="padding:${layout.paddingHeader};text-align:center;background-color:${colors.bgCard};border-radius:${layout.borderRadius} ${layout.borderRadius} 0 0;border-bottom:1px solid ${colors.borderHeader};">
-              <img src="${assets.logoUrl}" alt="${brand.name}" style="max-height:48px;width:auto;" />
+              <img src="${assets.logoUrl}" alt="${brand.name}" style="max-height:96px;width:auto;" />
             </td>
           </tr>
 
@@ -145,9 +145,9 @@ export function buildEmailHtml(options: {
 
           <!-- Footer -->
           <tr>
-            <td style="padding:${layout.paddingFooter};background-color:${colors.bgFooter};text-align:center;border-top:1px solid ${colors.borderHeader};border-radius:0 0 ${layout.borderRadius} ${layout.borderRadius};">
-              <p style="font-size:12px;color:${colors.textMuted};margin:0 0 8px;">${brand.copyright}</p>
-              <p style="font-size:12px;color:${colors.textMuted};margin:0;">${brand.footerText}</p>
+            <td style="padding:24px 40px;text-align:center;border-top:1px solid ${colors.borderLight};border-radius:0 0 ${layout.borderRadius} ${layout.borderRadius};">
+              <p style="font-size:11px;color:${colors.textMuted};margin:0 0 4px;">${brand.copyright}</p>
+              <p style="font-size:11px;color:${colors.textMuted};margin:0;">Desenvolvido para <span style="color:${colors.primary};font-weight:600;">${brand.name}</span></p>
             </td>
           </tr>
 
