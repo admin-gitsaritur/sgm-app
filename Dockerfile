@@ -17,6 +17,13 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
+# Recebe variáveis de ambiente em tempo de build (necessário pro Vite vazar pro bundle via import.meta.env.*)
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_APP_URL
+
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_APP_URL=$VITE_APP_URL
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
