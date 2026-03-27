@@ -2,16 +2,18 @@ import * as React from "react"
 import { cn } from "../../lib/utils"
 
 // ============================================================================
-// CURRENCY INPUT — Máscara de moeda brasileira (R$)
+// CURRENCY INPUT — Máscara numérica com suporte a decimais configuráveis
 // ============================================================================
 
 export interface CurrencyInputProps extends Omit<React.ComponentProps<"input">, "onChange" | "value" | "type" | "size"> {
-    /** Valor em centavos (inteiro) ou reais (float) */
+    /** Valor numérico como string */
     value: string
-    /** Callback com valor numérico (em reais, float) */
+    /** Callback com valor numérico como string */
     onChange: (value: string) => void
-    /** Símbolo monetário */
+    /** Símbolo prefixo (ex: R$, km, %) */
     symbol?: string
+    /** Casas decimais: 2 = moeda (padrão), 0 = inteiro (KM, Unidade) */
+    decimals?: number
     /** Mensagem de erro */
     error?: string
     /** Tamanho */
@@ -19,18 +21,21 @@ export interface CurrencyInputProps extends Omit<React.ComponentProps<"input">, 
 }
 
 /**
- * Input com máscara de moeda brasileira (R$).
- * Formata automaticamente com separador de milhar e decimais.
+ * Input numérico com máscara brasileira.
+ * - decimals=2 (padrão): formata como moeda (15.575,00)
+ * - decimals=0: formata como inteiro com separador de milhar (15.575)
  *
  * @example
  * ```tsx
  * <CurrencyInput value={form.valor} onChange={v => setForm({...form, valor: v})} />
+ * <CurrencyInput value={form.km} onChange={v => setForm({...form, km: v})} symbol="km" decimals={0} />
  * ```
  */
 export function CurrencyInput({
     value,
     onChange,
     symbol = "R$",
+    decimals = 2,
     error,
     size = "default",
     className,
@@ -38,27 +43,39 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
 
     const formatDisplay = (raw: string): string => {
-        // Remove tudo que não é dígito
         const digits = raw.replace(/\D/g, "")
         if (!digits) return ""
         const num = parseInt(digits, 10)
-        // Divide por 100 para centavos -> reais
-        const reais = num / 100
+
+        if (decimals === 0) {
+            // Inteiro: apenas separador de milhar
+            return num.toLocaleString("pt-BR")
+        }
+
+        // Moeda: divide por 10^decimals
+        const divisor = Math.pow(10, decimals)
+        const reais = num / divisor
         return reais.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
         })
     }
 
     const displayValue = React.useMemo(() => {
         if (!value && value !== "0") return ""
-        // Se já é um número raw, converter para display
         const num = parseFloat(value)
         if (isNaN(num)) return ""
-        // Converter reais para centavos string para formatar
-        const centavos = Math.round(num * 100).toString()
+
+        if (decimals === 0) {
+            // Inteiro: converter direto
+            return Math.round(num).toLocaleString("pt-BR")
+        }
+
+        // Moeda: converter reais para centavos string para formatar
+        const divisor = Math.pow(10, decimals)
+        const centavos = Math.round(num * divisor).toString()
         return formatDisplay(centavos)
-    }, [value])
+    }, [value, decimals])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value.replace(/\D/g, "")
@@ -66,8 +83,17 @@ export function CurrencyInput({
             onChange("")
             return
         }
-        const num = parseInt(raw, 10) / 100
-        onChange(num.toString())
+
+        if (decimals === 0) {
+            // Inteiro: valor direto
+            const num = parseInt(raw, 10)
+            onChange(num.toString())
+        } else {
+            // Moeda: divide por 10^decimals
+            const divisor = Math.pow(10, decimals)
+            const num = parseInt(raw, 10) / divisor
+            onChange(num.toString())
+        }
     }
 
     const sizeClasses = {
@@ -106,7 +132,7 @@ export function CurrencyInput({
                 )}
                 value={displayValue}
                 onChange={handleChange}
-                placeholder="0,00"
+                placeholder={decimals === 0 ? "0" : "0,00"}
                 {...props}
             />
 

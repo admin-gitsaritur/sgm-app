@@ -57,8 +57,24 @@ const getPeriodosComAno = (freq: string): string[] => {
 
 // ── Helpers ───────────────────────────────────────────────
 
-const formatCurrency = (centavos: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
+/** Unidades que não usam casas decimais (armazenadas como inteiro * 100) */
+const isIntegerUnit = (u: string) => u === 'KM' || u === 'UNIDADE';
+
+/** Retorna 0 para unidades inteiras (km, un) e 2 para monetárias (R$, %) */
+const getDecimals = (u: string) => isIntegerUnit(u) ? 0 : 2;
+
+/** Formata um valor em centavos para exibição conforme a unidade */
+const formatValue = (centavos: number, unidade: string = 'BRL') => {
+  const symbol = UNIDADE_LABELS[unidade] || '';
+  if (isIntegerUnit(unidade)) {
+    const val = Math.round(centavos / 100);
+    return `${val.toLocaleString('pt-BR')} ${symbol}`;
+  }
+  if (unidade === 'PERCENTUAL') {
+    return `${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%`;
+  }
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
+};
 
 const getPercent = (ind: any) =>
   ind.metaIndicadorCentavos > 0
@@ -229,8 +245,8 @@ export const Indicadores = () => {
       hiddenOnMobile: true,
       align: 'right' as const,
       cellVariant: 'none' as const,
-      render: (val: unknown) => (
-        <CellText variant="muted">{formatCurrency(val as number)}</CellText>
+      render: (val: unknown, row: any) => (
+        <CellText variant="muted">{formatValue(val as number, row.unidade)}</CellText>
       ),
     },
     {
@@ -239,8 +255,8 @@ export const Indicadores = () => {
       hiddenOnMobile: true,
       align: 'right' as const,
       cellVariant: 'none' as const,
-      render: (val: unknown) => (
-        <CellText className="font-semibold">{formatCurrency(val as number)}</CellText>
+      render: (val: unknown, row: any) => (
+        <CellText className="font-semibold">{formatValue(val as number, row.unidade)}</CellText>
       ),
     },
     {
@@ -480,6 +496,7 @@ export const Indicadores = () => {
                 value={form.metaIndicador}
                 onChange={v => setForm({ ...form, metaIndicador: v })}
                 symbol={UNIDADE_LABELS[form.unidade] || 'R$'}
+                decimals={getDecimals(form.unidade)}
               />
             </FormField>
           </div>
