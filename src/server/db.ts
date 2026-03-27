@@ -144,26 +144,7 @@ export async function initDb() {
     `);
 
     // ── Indexes ──
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      CREATE INDEX IF NOT EXISTS idx_users_cpf ON users(cpf);
-      CREATE INDEX IF NOT EXISTS idx_users_google_id ON users("googleId");
-      CREATE INDEX IF NOT EXISTS idx_metas_status ON metas(status);
-      CREATE INDEX IF NOT EXISTS idx_metas_ano ON metas(ano);
-      CREATE INDEX IF NOT EXISTS idx_projetos_meta ON projetos("metaId");
-      CREATE INDEX IF NOT EXISTS idx_projetos_responsavel ON projetos("responsavelPrincipal");
-      CREATE INDEX IF NOT EXISTS idx_projetos_status ON projetos(status);
-      CREATE INDEX IF NOT EXISTS idx_indicadores_projeto ON indicadores("projetoId");
-      CREATE INDEX IF NOT EXISTS idx_indicadores_responsavel ON indicadores(responsavel);
-      CREATE INDEX IF NOT EXISTS idx_historico_indicador ON historico_indicadores("indicadorId");
-      CREATE INDEX IF NOT EXISTS idx_historico_data ON historico_indicadores(data);
-      CREATE INDEX IF NOT EXISTS idx_auditoria_timestamp ON auditoria("timestamp");
-      CREATE INDEX IF NOT EXISTS idx_auditoria_user ON auditoria("userId");
-      CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade, "entidadeId");
-      CREATE INDEX IF NOT EXISTS idx_indicadores_meta_direta ON indicadores("metaId");
-      CREATE INDEX IF NOT EXISTS idx_indicadores_avulsos ON indicadores("projetoId") WHERE "projetoId" IS NULL;
-      CREATE INDEX IF NOT EXISTS idx_projetos_avulsos ON projetos("metaId") WHERE "metaId" IS NULL;
-    `);
+    // Os indexes foram movidos para a linha 230 (após migrations) para garantir que colunas existam
 
     // ── Trigger: auditoria imutável ──
     await client.query(`
