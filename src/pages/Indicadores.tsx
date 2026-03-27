@@ -19,7 +19,7 @@ import { CellText } from '../components/ui/CellText';
 import { toast } from '../components/ui/toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw, Clock } from 'lucide-react';
+import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw, Clock, Calendar } from 'lucide-react';
 import { UNIDADE_LABELS, isIntegerUnit, getDecimals, formatValue } from '../lib/formatUtils';
 
 // ── Constantes ────────────────────────────────────────────
@@ -54,10 +54,12 @@ const getPeriodosComAno = (freq: string): string[] => {
 
 // ── Helpers ───────────────────────────────────────────────
 
-const getPercent = (ind: any) =>
-  ind.metaIndicadorCentavos > 0
-    ? ((ind.realizadoCentavos / ind.metaIndicadorCentavos) * 100).toFixed(1)
+const getPercent = (ind: any) => {
+  const realizado = ind.realizadoMesCentavos !== undefined ? ind.realizadoMesCentavos : ind.realizadoCentavos;
+  return ind.metaIndicadorCentavos > 0
+    ? ((realizado / ind.metaIndicadorCentavos) * 100).toFixed(1)
     : '0.0';
+};
 
 // ── Component ─────────────────────────────────────────────
 
@@ -77,8 +79,15 @@ export const Indicadores = () => {
   const [search, setSearch] = useState('');
   const [updateValue, setUpdateValue] = useState('');
   const [updatePeriodo, setUpdatePeriodo] = useState('');
-  const [sortField, setSortField] = useState('');
+  const [sortField, setSortField] = useState('nome');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Month filter — default M-1
+  const [filterMes, setFilterMes] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   // History modal state
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -94,17 +103,19 @@ export const Indicadores = () => {
     tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') as string[],
   });
 
-  useEffect(() => { fetchData(); }, [filterProjetoId]);
+  useEffect(() => { fetchData(); }, [filterProjetoId, filterMes]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      let filterParam = '';
-      if (filterProjetoId === '__AVULSOS__') filterParam = '?avulsos=true';
-      else if (filterProjetoId && filterProjetoId !== '__ALL__') filterParam = `?projetoId=${filterProjetoId}`;
+      const searchParams = new URLSearchParams();
+      if (filterProjetoId === '__AVULSOS__') searchParams.set('avulsos', 'true');
+      else if (filterProjetoId && filterProjetoId !== '__ALL__') searchParams.set('projetoId', filterProjetoId);
+      if (filterMes) searchParams.set('mes', filterMes);
+      const qs = searchParams.toString();
 
       const [indRes, projRes, metaRes, userRes] = await Promise.all([
-        api(`/indicadores${filterParam}`),
+        api(`/indicadores${qs ? `?${qs}` : ''}`),
         api('/projetos'),
         api('/metas'),
         api('/usuarios/dropdown'),
@@ -300,9 +311,12 @@ export const Indicadores = () => {
       hiddenOnMobile: true,
       align: 'right' as const,
       cellVariant: 'none' as const,
-      render: (val: unknown, row: any) => (
-        <CellText className="font-semibold">{formatValue(val as number, row.unidade)}</CellText>
-      ),
+      render: (val: unknown, row: any) => {
+        const v = row.realizadoMesCentavos !== undefined ? row.realizadoMesCentavos : (val as number);
+        return (
+          <CellText className="font-semibold">{formatValue(v, row.unidade)}</CellText>
+        );
+      },
     },
     {
       key: 'percentual',
@@ -370,23 +384,10 @@ export const Indicadores = () => {
             onClick={(e) => {
               e.stopPropagation();
               setUpdateTarget(row);
-              setUpdateValue((row.realizadoCentavos / 100).toString());
-              // Calcular M-1: período anterior ao atual
-              const freq = row.frequenciaAtualizacao || 'MENSAL';
-              const periodos = PERIODICIDADE_PERIODOS[freq] || MESES;
-              const now = new Date();
-              const mesAtual = now.getMonth(); // 0-indexed
-              let periodoIdx = 0;
-              if (freq === 'MENSAL') {
-                periodoIdx = Math.max(0, mesAtual - 1); // M-1
-              } else if (freq === 'TRIMESTRAL') {
-                periodoIdx = Math.max(0, Math.floor(mesAtual / 3) - 1);
-              } else if (freq === 'QUADRIMESTRAL') {
-                periodoIdx = Math.max(0, Math.floor(mesAtual / 4) - 1);
-              } else if (freq === 'SEMESTRAL') {
-                periodoIdx = Math.max(0, Math.floor(mesAtual / 6) - 1);
-              }
-              setUpdatePeriodo(periodoIdx.toString());
+              setUpdateValue('');
+              // Pre-select the month from the dropdown filter
+              const mesIdx = parseInt(filterMes.split('-')[1]) - 1;
+              setUpdatePeriodo(mesIdx.toString());
               setIsUpdateModalOpen(true);
             }}
           />
@@ -451,6 +452,26 @@ export const Indicadores = () => {
         onSearchChange={setSearch}
         actionButton={
           <div className="flex items-center gap-2">
+            {/* Month selector */}
+            <Select value={filterMes} onValueChange={setFilterMes}>
+              <SelectTrigger className="w-44 h-12">
+                <Calendar size={16} className="mr-1 text-stone-400" />
+                <SelectValue placeholder="Mês" />
+              </SelectTrigger>
+              <SelectContent>
+                {(() => {
+                  const options = [];
+                  const now = new Date();
+                  for (let i = 0; i < 12; i++) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    const label = `${MESES_FULL[d.getMonth()]}/${d.getFullYear()}`;
+                    options.push(<SelectItem key={val} value={val}>{label}</SelectItem>);
+                  }
+                  return options;
+                })()}
+              </SelectContent>
+            </Select>
             {projetos.length > 0 && (
               <Select value={filterProjetoId} onValueChange={setFilterProjetoId}>
                 <SelectTrigger className="w-52 h-12">

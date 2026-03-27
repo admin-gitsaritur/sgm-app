@@ -19,6 +19,7 @@ indicadoresRouter.get('/', async (req: AuthRequest, res) => {
   const projetoId = req.query.projetoId as string;
   const metaId = req.query.metaId as string;
   const avulsos = req.query.avulsos as string;
+  const mes = req.query.mes as string; // format: YYYY-MM
 
   let where = 'i."deletedAt" IS NULL';
   const params: unknown[] = [];
@@ -27,21 +28,39 @@ indicadoresRouter.get('/', async (req: AuthRequest, res) => {
   if (metaId) { where += ` AND (p."metaId" = $${idx} OR i."metaId" = $${idx})`; params.push(metaId); idx++; }
   if (avulsos === 'true') { where += ` AND i."projetoId" IS NULL AND i."metaId" IS NULL`; }
 
+  // Month-specific subquery for realizado
+  let mesJoin = '';
+  let mesSelect = '';
+  if (mes && /^\d{4}-\d{2}$/.test(mes)) {
+    const [year, month] = mes.split('-').map(Number);
+    const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+    const endDate = new Date(Date.UTC(year, month, 1)).toISOString();
+    mesSelect = `, COALESCE(hm."totalMes", 0) as "realizadoMesCentavos"`;
+    mesJoin = ` LEFT JOIN (
+      SELECT "indicadorId", SUM("valorCentavos") as "totalMes"
+      FROM historico_indicadores
+      WHERE data >= $${idx} AND data < $${idx + 1}
+      GROUP BY "indicadorId"
+    ) hm ON hm."indicadorId" = i.id`;
+    params.push(startDate, endDate);
+    idx += 2;
+  }
+
   try {
     const totalResult = await query(
       `SELECT COUNT(*) as count FROM indicadores i LEFT JOIN projetos p ON p.id = i."projetoId" WHERE ${where}`,
-      params
+      params.slice(0, mes ? params.length - 2 : params.length) // count doesn't need mes params
     );
     const total = parseInt(totalResult.rows[0].count);
 
     const result = await query(`
       SELECT i.*, p.nome as "projetoNome",
-             COALESCE(m.nome, md.nome) as "metaNome"
+             COALESCE(m.nome, md.nome) as "metaNome"${mesSelect}
       FROM indicadores i
       LEFT JOIN projetos p ON p.id = i."projetoId"
       LEFT JOIN metas m ON m.id = p."metaId"
-      LEFT JOIN metas md ON md.id = i."metaId"
-      WHERE ${where} ORDER BY i."criadoEm" DESC LIMIT $${idx++} OFFSET $${idx++}
+      LEFT JOIN metas md ON md.id = i."metaId"${mesJoin}
+      WHERE ${where} ORDER BY i.nome ASC LIMIT $${idx++} OFFSET $${idx++}
     `, [...params, limit, offset]);
 
     res.json({
