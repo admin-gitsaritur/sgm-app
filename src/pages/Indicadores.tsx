@@ -28,7 +28,7 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'default
 };
 
 const UNIDADE_LABELS: Record<string, string> = {
-  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un',
+  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un', KM: 'km',
 };
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -449,6 +449,7 @@ export const Indicadores = () => {
                   <SelectItem value="BRL">R$ (Reais)</SelectItem>
                   <SelectItem value="PERCENTUAL">% (Percentual)</SelectItem>
                   <SelectItem value="UNIDADE">Un (Unidade)</SelectItem>
+                  <SelectItem value="KM">KM (Quilômetros)</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>

@@ -29,7 +29,7 @@ import { ptBR } from 'date-fns/locale';
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const UNIDADE_LABELS: Record<string, string> = {
-  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un',
+  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un', KM: 'km',
 };
 
 const PERIODICIDADE_LABELS: Record<string, string> = {
@@ -56,6 +56,7 @@ const formatValue = (centavos: number, unidade?: string) => {
   switch (unidade) {
     case 'PERCENTUAL': return `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}%`;
     case 'UNIDADE': return `${valor.toLocaleString('pt-BR')} un`;
+    case 'KM': return `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} km`;
     default: return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   }
 };
@@ -315,8 +316,8 @@ export const Metas = () => {
   };
 
   // ── Curva helpers ──
-  const valorLabel = form.unidadeMeta === 'PERCENTUAL' ? 'Valor da Meta (%)' : form.unidadeMeta === 'UNIDADE' ? 'Valor da Meta (un)' : 'Valor da Meta (R$)';
-  const valorIcon = form.unidadeMeta === 'PERCENTUAL' ? <Percent size={16} /> : form.unidadeMeta === 'UNIDADE' ? <Hash size={16} /> : <DollarSign size={16} />;
+  const valorLabel = form.unidadeMeta === 'PERCENTUAL' ? 'Valor da Meta (%)' : form.unidadeMeta === 'UNIDADE' ? 'Valor da Meta (un)' : form.unidadeMeta === 'KM' ? 'Valor da Meta (km)' : 'Valor da Meta (R$)';
+  const valorIcon = form.unidadeMeta === 'PERCENTUAL' ? <Percent size={16} /> : form.unidadeMeta === 'UNIDADE' ? <Hash size={16} /> : form.unidadeMeta === 'KM' ? <Hash size={16} /> : <DollarSign size={16} />;
   const somaCurva = form.curvaPersonalizada.reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const valorMeta = parseFloat(form.valorMeta) || 0;
   const progressoCurva = valorMeta > 0 ? (somaCurva / valorMeta) * 100 : 0;
@@ -413,6 +414,7 @@ export const Metas = () => {
                   <SelectItem value="BRL">R$ (Reais)</SelectItem>
                   <SelectItem value="PERCENTUAL">% (Percentual)</SelectItem>
                   <SelectItem value="UNIDADE">Un (Unidade)</SelectItem>
+                  <SelectItem value="KM">KM (Quilômetros)</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
