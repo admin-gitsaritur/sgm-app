@@ -105,7 +105,7 @@ export const Indicadores = () => {
         api(`/indicadores${filterParam}`),
         api('/projetos'),
         api('/metas'),
-        api('/usuarios'),
+        api('/usuarios/dropdown'),
       ]);
       if (indRes.success) setIndicadores(indRes.data);
       if (projRes.success) setProjetos(projRes.data);
@@ -461,12 +461,6 @@ export const Indicadores = () => {
           </FormField>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Meta do Indicador">
-              <CurrencyInput
-                value={form.metaIndicador}
-                onChange={v => setForm({ ...form, metaIndicador: v })}
-              />
-            </FormField>
             <FormField label="Unidade">
               <Select value={form.unidade} onValueChange={v => setForm({ ...form, unidade: v })}>
                 <SelectTrigger>
@@ -479,6 +473,14 @@ export const Indicadores = () => {
                   <SelectItem value="KM">KM (Quilômetros)</SelectItem>
                 </SelectContent>
               </Select>
+            </FormField>
+            
+            <FormField label="Meta do Indicador">
+              <CurrencyInput
+                value={form.metaIndicador}
+                onChange={v => setForm({ ...form, metaIndicador: v })}
+                symbol={UNIDADE_LABELS[form.unidade] || 'R$'}
+              />
             </FormField>
           </div>
 

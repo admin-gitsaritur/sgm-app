@@ -14,6 +14,16 @@ import { emailConfig } from '../services/email-config.js';
 export const usuariosRouter = Router();
 usuariosRouter.use(authenticate);
 
+// ── GET /dropdown — Lista simples para selects ──────────────
+usuariosRouter.get('/dropdown', async (req: AuthRequest, res) => {
+  try {
+    const result = await query('SELECT id, nome, email FROM users WHERE ativo = true AND "deletedAt" IS NULL ORDER BY nome');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
 // ── GET / — List with pagination ──────────────────────────
 usuariosRouter.get('/', authorize(['ADMIN']), async (req: AuthRequest, res) => {
   const page = parseInt(req.query.page as string) || 1;

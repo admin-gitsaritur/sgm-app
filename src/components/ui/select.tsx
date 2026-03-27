@@ -67,7 +67,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       className={cn(
         // Base
-        "flex w-full items-center justify-between gap-2",
+        "relative flex w-full items-center justify-between gap-2",
         "h-11 rounded-xl border bg-white",
         "text-sm font-medium text-brown",
         // Padding
