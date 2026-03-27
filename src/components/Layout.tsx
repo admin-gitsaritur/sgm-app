@@ -16,7 +16,7 @@ import clsx from 'clsx';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Gauge, roles: ['ADMIN', 'GESTOR', 'OPERADOR', 'VISUALIZADOR'] },
-  { path: '/metas', label: 'Metas', icon: Target, roles: ['ADMIN'] },
+  { path: '/metas', label: 'Metas Globais', icon: Target, roles: ['ADMIN'] },
   { path: '/projetos', label: 'Projetos', icon: Briefcase, roles: ['ADMIN', 'GESTOR'] },
   { path: '/indicadores', label: 'Indicadores', icon: BarChart2, roles: ['ADMIN', 'GESTOR', 'OPERADOR'] },
   { path: '/mapeamento', label: 'Mapeamento', icon: GitBranch, roles: ['ADMIN', 'GESTOR'] },

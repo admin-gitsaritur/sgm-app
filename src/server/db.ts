@@ -112,7 +112,7 @@ export async function initDb() {
         "realizadoCentavos" BIGINT NOT NULL DEFAULT 0,
         unidade TEXT NOT NULL,
         peso DOUBLE PRECISION NOT NULL,
-        "frequenciaAtualizacao" TEXT NOT NULL CHECK("frequenciaAtualizacao" IN ('MENSAL','QUINZENAL','SEMANAL')),
+        "frequenciaAtualizacao" TEXT NOT NULL CHECK("frequenciaAtualizacao" IN ('MENSAL','QUINZENAL','SEMANAL','TRIMESTRAL','QUADRIMESTRAL','SEMESTRAL')),
         responsavel TEXT NOT NULL REFERENCES users(id),
         "dataUltimaAtualizacao" TIMESTAMPTZ,
         "statusAtualizacao" TEXT DEFAULT 'PENDENTE' CHECK("statusAtualizacao" IN ('ATUALIZADO','PENDENTE','ATRASADO')),

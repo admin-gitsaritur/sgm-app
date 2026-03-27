@@ -43,8 +43,8 @@ export const createIndicadorSchema = z.object({
     nome: z.string().min(3).max(200).trim(),
     metaIndicador: z.number().positive('Deve ser positivo').finite(),
     unidade: z.string().min(1).max(50).trim(),
-    peso: z.number().positive().max(1, 'Peso máximo é 1.0'),
-    frequenciaAtualizacao: z.enum(['MENSAL', 'QUINZENAL', 'SEMANAL']),
+    peso: z.number().nonnegative('Peso não pode ser negativo').max(1, 'Peso máximo é 1.0'),
+    frequenciaAtualizacao: z.enum(['MENSAL', 'QUINZENAL', 'SEMANAL', 'TRIMESTRAL', 'QUADRIMESTRAL', 'SEMESTRAL']),
     responsavel: z.string().uuid('ID de responsável inválido'),
 });
 
