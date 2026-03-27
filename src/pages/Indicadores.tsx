@@ -189,21 +189,21 @@ export const Indicadores = () => {
     if (!updateTarget) return;
     setSaving(true);
     try {
-      // Calculate the date from period index
+      // Calculate the date from period index — always day 1, UTC noon to avoid timezone rollover
       const freq = updateTarget.frequenciaAtualizacao || 'MENSAL';
       const periodoIdx = parseInt(updatePeriodo) || 0;
       const year = new Date().getFullYear();
       let dataRef: string;
       if (freq === 'MENSAL') {
-        dataRef = new Date(year, periodoIdx, 15).toISOString();
+        dataRef = new Date(Date.UTC(year, periodoIdx, 1, 12, 0, 0)).toISOString();
       } else if (freq === 'TRIMESTRAL') {
-        dataRef = new Date(year, periodoIdx * 3 + 1, 15).toISOString();
+        dataRef = new Date(Date.UTC(year, periodoIdx * 3, 1, 12, 0, 0)).toISOString();
       } else if (freq === 'QUADRIMESTRAL') {
-        dataRef = new Date(year, periodoIdx * 4 + 2, 15).toISOString();
+        dataRef = new Date(Date.UTC(year, periodoIdx * 4, 1, 12, 0, 0)).toISOString();
       } else if (freq === 'SEMESTRAL') {
-        dataRef = new Date(year, periodoIdx * 6 + 3, 15).toISOString();
+        dataRef = new Date(Date.UTC(year, periodoIdx * 6, 1, 12, 0, 0)).toISOString();
       } else {
-        dataRef = new Date().toISOString();
+        dataRef = new Date(Date.UTC(year, new Date().getMonth(), 1, 12, 0, 0)).toISOString();
       }
 
       await api(`/indicadores/${updateTarget.id}/atualizar`, {
@@ -702,8 +702,11 @@ export const Indicadores = () => {
                   {editingHist?.id === h.id ? (
                     <div className="flex-1 grid grid-cols-3 gap-2 items-end">
                       <FormField label="Data">
-                        <Input type="date" size="sm" value={editHistDate.split('T')[0]}
-                          onChange={e => setEditHistDate(e.target.value + 'T12:00:00.000Z')} />
+                        <Input type="date" size="sm" value={editHistDate.slice(0, 10)}
+                          onChange={e => {
+                            const [y, m, d] = e.target.value.split('-').map(Number);
+                            setEditHistDate(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toISOString());
+                          }} />
                       </FormField>
                       <FormField label="Valor">
                         <CurrencyInput
@@ -725,7 +728,7 @@ export const Indicadores = () => {
                           {formatValue(h.valorCentavos, historyTarget?.unidade || 'BRL')}
                         </p>
                         <p className="text-xs text-stone-400">
-                          {new Date(h.data).toLocaleDateString('pt-BR')} • {h.atualizadoPorNome || 'Sistema'}
+                          {(() => { const d = new Date(h.data); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; })()} • {h.atualizadoPorNome || 'Sistema'}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
