@@ -71,7 +71,7 @@ export async function initDb() {
         id TEXT PRIMARY KEY,
         nome TEXT NOT NULL,
         "valorMetaCentavos" BIGINT NOT NULL,
-        "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL' CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE')),
+        "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL' CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE','KM')),
         ano INTEGER NOT NULL,
         "periodoInicio" DATE NOT NULL,
         "periodoFim" DATE NOT NULL,
@@ -216,7 +216,7 @@ export async function initDb() {
 
       ALTER TABLE metas DROP CONSTRAINT IF EXISTS metas_unidadeMeta_check;
       ALTER TABLE metas ADD CONSTRAINT metas_unidadeMeta_check
-        CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE'));
+        CHECK("unidadeMeta" IN ('BRL','PERCENTUAL','UNIDADE','KM'));
 
       -- Projetos: prazo e responsável agora são opcionais
       ALTER TABLE projetos ALTER COLUMN "prazoInicio" DROP NOT NULL;
