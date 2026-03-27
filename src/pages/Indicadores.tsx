@@ -20,15 +20,12 @@ import { toast } from '../components/ui/toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw } from 'lucide-react';
+import { UNIDADE_LABELS, isIntegerUnit, getDecimals, formatValue } from '../lib/formatUtils';
 
 // ── Constantes ────────────────────────────────────────────
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
   ATUALIZADO: 'success', PENDENTE: 'warning', ATRASADO: 'danger',
-};
-
-const UNIDADE_LABELS: Record<string, string> = {
-  BRL: 'R$', PERCENTUAL: '%', UNIDADE: 'un', KM: 'km',
 };
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -56,25 +53,6 @@ const getPeriodosComAno = (freq: string): string[] => {
 };
 
 // ── Helpers ───────────────────────────────────────────────
-
-/** Unidades que não usam casas decimais (armazenadas como inteiro * 100) */
-const isIntegerUnit = (u: string) => u === 'KM' || u === 'UNIDADE';
-
-/** Retorna 0 para unidades inteiras (km, un) e 2 para monetárias (R$, %) */
-const getDecimals = (u: string) => isIntegerUnit(u) ? 0 : 2;
-
-/** Formata um valor em centavos para exibição conforme a unidade */
-const formatValue = (centavos: number, unidade: string = 'BRL') => {
-  const symbol = UNIDADE_LABELS[unidade] || '';
-  if (isIntegerUnit(unidade)) {
-    const val = Math.round(centavos / 100);
-    return `${val.toLocaleString('pt-BR')} ${symbol}`;
-  }
-  if (unidade === 'PERCENTUAL') {
-    return `${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%`;
-  }
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
-};
 
 const getPercent = (ind: any) =>
   ind.metaIndicadorCentavos > 0
@@ -621,6 +599,8 @@ export const Indicadores = () => {
             <CurrencyInput
               value={updateValue}
               onChange={setUpdateValue}
+              symbol={UNIDADE_LABELS[updateTarget?.unidade] || 'R$'}
+              decimals={getDecimals(updateTarget?.unidade || 'BRL')}
             />
           </FormField>
         </div>

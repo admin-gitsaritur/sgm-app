@@ -7,6 +7,7 @@ import {
   Target, TrendingUp, AlertTriangle, DollarSign,
   BarChart2, ChevronRight, RefreshCw, Gauge, Briefcase
 } from 'lucide-react';
+import { formatValue, formatValueShort } from '../lib/formatUtils';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, BarChart, Bar,
@@ -81,18 +82,6 @@ const RiskBadge = ({ risk }: { risk: string }) => {
       {risk}
     </span>
   );
-};
-
-// ─── Utilitários ─────────────────────────────────────────────────────
-
-const formatCurrency = (centavos: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
-
-const formatCurrencyShort = (centavos: number) => {
-  const v = centavos / 100;
-  if (v >= 1000000) return `R$ ${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `R$ ${(v / 1000).toFixed(0)}K`;
-  return formatCurrency(centavos);
 };
 
 const semaforoColor = (s: string) =>
@@ -226,22 +215,22 @@ export const Dashboard = () => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-6 pb-6">
               <KpiCard
                 label="Valor da Meta"
-                value={formatCurrencyShort(item.meta.valorMetaCentavos)}
+                value={formatValueShort(item.meta.valorMetaCentavos, item.meta.unidadeMeta)}
                 icon={<Target className="w-5 h-5 text-primary" />}
               />
               <KpiCard
                 label="Realizado"
-                value={formatCurrencyShort(item.realizadoAcumuladoCentavos)}
+                value={formatValueShort(item.realizadoAcumuladoCentavos, item.meta.unidadeMeta)}
                 icon={<DollarSign className="w-5 h-5 text-primary" />}
               />
               <KpiCard
                 label="Projeção Linear"
-                value={formatCurrencyShort(item.projecaoLinearCentavos)}
+                value={formatValueShort(item.projecaoLinearCentavos, item.meta.unidadeMeta)}
                 icon={<TrendingUp className="w-5 h-5 text-primary" />}
               />
               <KpiCard
                 label="Desvio"
-                value={formatCurrency(item.desvioCentavos)}
+                value={formatValue(item.desvioCentavos, item.meta.unidadeMeta)}
                 icon={<BarChart2 className="w-5 h-5 text-primary" />}
                 trend={item.esperadoAcumuladoCentavos > 0
                   ? (item.desvioCentavos / item.esperadoAcumuladoCentavos * 100)
@@ -267,8 +256,8 @@ export const Dashboard = () => {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                     <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => formatCurrencyShort(v)} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => formatValueShort(v, item.meta.unidadeMeta)} />
+                    <Tooltip formatter={(v: number) => formatValue(v, item.meta.unidadeMeta)} />
                     <Legend />
                     <Area type="monotone" dataKey="esperadoCentavos" name="Esperado" stroke="#94A3B8" fill="none" strokeDasharray="5 5" />
                     <Area type="monotone" dataKey="realizadoCentavos" name="Realizado" stroke="#F37137" fill={`url(#grad-real-${item.meta.id})`} strokeWidth={2} connectNulls={false} />
@@ -291,8 +280,8 @@ export const Dashboard = () => {
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                       <XAxis dataKey="nome" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => formatCurrencyShort(v)} />
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => formatValueShort(v, item.meta.unidadeMeta)} />
+                      <Tooltip formatter={(v: number) => formatValue(v, item.meta.unidadeMeta)} />
                       <Legend />
                       <Bar dataKey="esperada" name="Esperada" fill="#E5E7EB" radius={[6, 6, 0, 0]} />
                       <Bar dataKey="contribuicao" name="Realizada" fill="#F37137" radius={[6, 6, 0, 0]} />
@@ -333,7 +322,7 @@ export const Dashboard = () => {
                   {item.percentualAtingimento.toFixed(1)}%
                 </text>
                 <text x="100" y="118" textAnchor="middle" className="fill-brown/40" style={{ fontSize: '10px' }}>
-                  de {formatCurrencyShort(item.meta.valorMetaCentavos)}
+                  de {formatValueShort(item.meta.valorMetaCentavos, item.meta.unidadeMeta)}
                 </text>
               </svg>
             </div>
@@ -439,7 +428,7 @@ export const Dashboard = () => {
                             <span className="text-xs font-medium text-brown/60">{p.percentualExecucao.toFixed(1)}%</span>
                           </div>
                         </td>
-                        <td className="px-6 py-3.5 text-sm text-brown">{formatCurrency(p.contribuicaoRealEstimadaCentavos)}</td>
+                        <td className="px-6 py-3.5 text-sm text-brown">{formatValue(p.contribuicaoRealEstimadaCentavos, item.meta.unidadeMeta)}</td>
                         <td className="px-6 py-3.5 text-sm">
                           {p.indicadoresAtrasados > 0 ? (
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-rose-50 text-rose-600 text-xs font-bold">
@@ -555,8 +544,8 @@ export const Dashboard = () => {
                   {avulsosData.indicadores.map((item: any) => (
                     <tr key={item.indicador.id} className="hover:bg-stone-50/50 transition-colors">
                       <td className="px-6 py-3.5 text-sm font-medium text-brown">{item.indicador.nome}</td>
-                      <td className="px-6 py-3.5 text-sm text-brown">{formatCurrency(item.indicador.metaIndicadorCentavos)}</td>
-                      <td className="px-6 py-3.5 text-sm text-brown">{formatCurrency(item.indicador.realizadoCentavos)}</td>
+                      <td className="px-6 py-3.5 text-sm text-brown">{formatValue(item.indicador.metaIndicadorCentavos, item.indicador.unidade)}</td>
+                      <td className="px-6 py-3.5 text-sm text-brown">{formatValue(item.indicador.realizadoCentavos, item.indicador.unidade)}</td>
                       <td className="px-6 py-3.5 text-sm">
                         <span className="text-xs font-bold text-brown mr-2">{item.percentualAtingido.toFixed(1)}%</span>
                       </td>

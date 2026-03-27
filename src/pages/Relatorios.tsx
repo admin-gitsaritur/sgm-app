@@ -3,11 +3,9 @@ import { api } from '../services/api';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { FileText, Download, AlertTriangle, RefreshCw, Calendar, TrendingUp, Target, Users } from 'lucide-react';
+import { formatValue } from '../lib/formatUtils';
 
 const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-const formatCurrency = (centavos: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
 
 const SemaforoDot = ({ status }: { status: string }) => {
     const colors: Record<string, string> = { VERDE: 'bg-emerald-500', AMARELO: 'bg-amber-400', VERMELHO: 'bg-rose-500' };
@@ -118,7 +116,7 @@ export const Relatorios = () => {
                                     </div>
                                     <div className="flex items-center gap-4 text-sm">
                                         <span className="text-brown/60">{meta.percentualAtingimento.toFixed(1)}%</span>
-                                        <span className="text-brown font-medium">{formatCurrency(meta.realizadoCentavos)}</span>
+                                        <span className="text-brown font-medium">{formatValue(meta.realizadoCentavos, meta.unidadeMeta)}</span>
                                     </div>
                                 </div>
                             ))}
