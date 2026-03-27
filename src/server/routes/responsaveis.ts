@@ -20,8 +20,8 @@ responsaveisRouter.get('/', async (req: AuthRequest, res) => {
             const indResult = await query(
                 `SELECT i.*, p."contribuicaoEsperadaCentavos", p.nome as "projetoNome"
          FROM indicadores i
-         JOIN projetos p ON i."projetoId" = p.id
-         WHERE i.responsavel = $1 AND i."deletedAt" IS NULL AND p."deletedAt" IS NULL`,
+         LEFT JOIN projetos p ON i."projetoId" = p.id
+         WHERE i.responsavel = $1 AND i."deletedAt" IS NULL AND (p."deletedAt" IS NULL OR i."projetoId" IS NULL)`,
                 [user.id]
             );
 
@@ -98,11 +98,12 @@ responsaveisRouter.get('/:id', async (req: AuthRequest, res) => {
 
         // Indicadores detalhados
         const indResult = await query(
-            `SELECT i.*, p.nome as "projetoNome", m.nome as "metaNome"
+            `SELECT i.*, p.nome as "projetoNome", COALESCE(m.nome, md.nome) as "metaNome"
        FROM indicadores i
-       JOIN projetos p ON i."projetoId" = p.id
-       JOIN metas m ON p."metaId" = m.id
-       WHERE i.responsavel = $1 AND i."deletedAt" IS NULL AND p."deletedAt" IS NULL`,
+       LEFT JOIN projetos p ON i."projetoId" = p.id
+       LEFT JOIN metas m ON p."metaId" = m.id
+       LEFT JOIN metas md ON md.id = i."metaId"
+       WHERE i.responsavel = $1 AND i."deletedAt" IS NULL AND (p."deletedAt" IS NULL OR i."projetoId" IS NULL)`,
             [user.id]
         );
 
@@ -110,7 +111,7 @@ responsaveisRouter.get('/:id', async (req: AuthRequest, res) => {
         const projResult = await query(
             `SELECT p.*, m.nome as "metaNome"
        FROM projetos p
-       JOIN metas m ON p."metaId" = m.id
+       LEFT JOIN metas m ON p."metaId" = m.id
        WHERE p."responsavelPrincipal" = $1 AND p."deletedAt" IS NULL`,
             [user.id]
         );

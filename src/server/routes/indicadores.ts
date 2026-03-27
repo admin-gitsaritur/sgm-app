@@ -18,12 +18,14 @@ indicadoresRouter.get('/', async (req: AuthRequest, res) => {
   const offset = (page - 1) * limit;
   const projetoId = req.query.projetoId as string;
   const metaId = req.query.metaId as string;
+  const avulsos = req.query.avulsos as string;
 
   let where = 'i."deletedAt" IS NULL';
   const params: unknown[] = [];
   let idx = 1;
   if (projetoId) { where += ` AND i."projetoId" = $${idx++}`; params.push(projetoId); }
-  if (metaId) { where += ` AND p."metaId" = $${idx++}`; params.push(metaId); }
+  if (metaId) { where += ` AND (p."metaId" = $${idx} OR i."metaId" = $${idx})`; params.push(metaId); idx++; }
+  if (avulsos === 'true') { where += ` AND i."projetoId" IS NULL AND i."metaId" IS NULL`; }
 
   try {
     const totalResult = await query(
@@ -33,10 +35,12 @@ indicadoresRouter.get('/', async (req: AuthRequest, res) => {
     const total = parseInt(totalResult.rows[0].count);
 
     const result = await query(`
-      SELECT i.*, p.nome as "projetoNome", m.nome as "metaNome"
+      SELECT i.*, p.nome as "projetoNome",
+             COALESCE(m.nome, md.nome) as "metaNome"
       FROM indicadores i
       LEFT JOIN projetos p ON p.id = i."projetoId"
       LEFT JOIN metas m ON m.id = p."metaId"
+      LEFT JOIN metas md ON md.id = i."metaId"
       WHERE ${where} ORDER BY i."criadoEm" DESC LIMIT $${idx++} OFFSET $${idx++}
     `, [...params, limit, offset]);
 
@@ -54,7 +58,15 @@ indicadoresRouter.get('/', async (req: AuthRequest, res) => {
 // ── GET /:id ──────────────────────────────────────────────
 indicadoresRouter.get('/:id', async (req: AuthRequest, res) => {
   try {
-    const result = await query('SELECT * FROM indicadores WHERE id = $1 AND "deletedAt" IS NULL', [req.params.id]);
+    const result = await query(`
+      SELECT i.*, p.nome as "projetoNome",
+             COALESCE(m.nome, md.nome) as "metaNome"
+      FROM indicadores i
+      LEFT JOIN projetos p ON p.id = i."projetoId"
+      LEFT JOIN metas m ON m.id = p."metaId"
+      LEFT JOIN metas md ON md.id = i."metaId"
+      WHERE i.id = $1 AND i."deletedAt" IS NULL
+    `, [req.params.id]);
     const indicador = result.rows[0];
     if (!indicador) return res.status(404).json({ success: false, error: 'Indicador não encontrado' });
 
@@ -71,18 +83,32 @@ indicadoresRouter.get('/:id', async (req: AuthRequest, res) => {
 
 // ── POST / — Create ──────────────────────────────────────
 indicadoresRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createIndicadorSchema), async (req: AuthRequest, res) => {
-  const { projetoId, nome, metaIndicador, unidade, peso, frequenciaAtualizacao, responsavel } = req.body;
+  const { projetoId, metaId, nome, metaIndicador, unidade, peso, frequenciaAtualizacao, responsavel } = req.body;
 
   try {
-    const projetoResult = await query('SELECT * FROM projetos WHERE id = $1 AND "deletedAt" IS NULL', [projetoId]);
-    if (projetoResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
+    if (projetoId) {
+      const projetoResult = await query('SELECT * FROM projetos WHERE id = $1 AND "deletedAt" IS NULL', [projetoId]);
+      if (projetoResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
 
-    const pesosResult = await query('SELECT peso FROM indicadores WHERE "projetoId" = $1 AND "deletedAt" IS NULL', [projetoId]);
-    let somaPesos = new Decimal(peso);
-    for (const i of pesosResult.rows) somaPesos = somaPesos.plus(i.peso);
+      // Validação de soma de pesos (apenas quando existe vínculo com projeto)
+      const pesosResult = await query('SELECT peso FROM indicadores WHERE "projetoId" = $1 AND "deletedAt" IS NULL', [projetoId]);
+      let somaPesos = new Decimal(peso);
+      for (const i of pesosResult.rows) somaPesos = somaPesos.plus(i.peso);
 
-    if (somaPesos.greaterThan(1)) {
-      return res.status(400).json({ success: false, error: `Soma dos pesos excede 1.0 (seria ${somaPesos.toFixed(2)})` });
+      if (somaPesos.greaterThan(1)) {
+        return res.status(400).json({ success: false, error: `Soma dos pesos excede 1.0 (seria ${somaPesos.toFixed(2)})` });
+      }
+    }
+
+    if (metaId && !projetoId) {
+      const metaResult = await query('SELECT * FROM metas WHERE id = $1 AND "deletedAt" IS NULL', [metaId]);
+      if (metaResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
+    }
+
+    let resolvedMetaId = metaId || null;
+    if (projetoId && !metaId) {
+       const projMeta = await query('SELECT "metaId" FROM projetos WHERE id = $1', [projetoId]);
+       if (projMeta.rows.length > 0) resolvedMetaId = projMeta.rows[0].metaId;
     }
 
     const id = crypto.randomUUID();
@@ -90,9 +116,9 @@ indicadoresRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createIndic
     const metaIndicadorCentavos = Math.round(metaIndicador * 100);
 
     await query(`
-      INSERT INTO indicadores (id, "projetoId", nome, "metaIndicadorCentavos", "realizadoCentavos", unidade, peso, "frequenciaAtualizacao", responsavel, "dataUltimaAtualizacao", "statusAtualizacao", "criadoEm", "atualizadoEm")
-      VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, 'PENDENTE', $10, $11)
-    `, [id, projetoId, nome, metaIndicadorCentavos, unidade, peso, frequenciaAtualizacao, responsavel, now, now, now]);
+      INSERT INTO indicadores (id, "projetoId", "metaId", nome, "metaIndicadorCentavos", "realizadoCentavos", unidade, peso, "frequenciaAtualizacao", responsavel, "dataUltimaAtualizacao", "statusAtualizacao", "criadoEm", "atualizadoEm")
+      VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, 'PENDENTE', $11, $12)
+    `, [id, projetoId || null, resolvedMetaId, nome, metaIndicadorCentavos, unidade, peso, frequenciaAtualizacao, responsavel, now, now, now]);
 
     await logAudit(req.user!.id, 'CREATE', 'Indicador', id, null, req.body, req.ip, req.headers['user-agent']);
     res.json({ success: true, data: { id } });
@@ -109,15 +135,24 @@ indicadoresRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateInd
     const indicador = result.rows[0];
     if (!indicador) return res.status(404).json({ success: false, error: 'Indicador não encontrado' });
 
-    const { nome, metaIndicador, unidade, peso, frequenciaAtualizacao, responsavel } = req.body;
+    const { projetoId, metaId, nome, metaIndicador, unidade, peso, frequenciaAtualizacao, responsavel } = req.body;
     const now = new Date().toISOString();
 
-    if (peso !== undefined && peso !== indicador.peso) {
+    const novoProjetoId = projetoId !== undefined ? (projetoId || null) : indicador.projetoId;
+    let resolvedMetaId = metaId !== undefined ? (metaId || null) : indicador.metaId;
+
+    if (novoProjetoId && (projetoId !== undefined || metaId === undefined)) {
+       const projMeta = await query('SELECT "metaId" FROM projetos WHERE id = $1', [novoProjetoId]);
+       if (projMeta.rows.length > 0) resolvedMetaId = projMeta.rows[0].metaId;
+    }
+
+    if (novoProjetoId && (novoProjetoId !== indicador.projetoId || (peso !== undefined && peso !== indicador.peso))) {
+      const p = peso ?? indicador.peso;
       const outrosResult = await query(
         'SELECT peso FROM indicadores WHERE "projetoId" = $1 AND id != $2 AND "deletedAt" IS NULL',
-        [indicador.projetoId, indicador.id]
+        [novoProjetoId, indicador.id]
       );
-      let soma = new Decimal(peso);
+      let soma = new Decimal(p);
       for (const i of outrosResult.rows) soma = soma.plus(i.peso);
       if (soma.greaterThan(1)) {
         return res.status(400).json({ success: false, error: `Soma dos pesos excederia 1.0 (${soma.toFixed(2)})` });
@@ -127,10 +162,10 @@ indicadoresRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateInd
     const metaCentavos = metaIndicador !== undefined ? Math.round(metaIndicador * 100) : indicador.metaIndicadorCentavos;
 
     await query(`
-      UPDATE indicadores SET nome = $1, "metaIndicadorCentavos" = $2, unidade = $3, peso = $4,
-      "frequenciaAtualizacao" = $5, responsavel = $6, "atualizadoEm" = $7 WHERE id = $8
+      UPDATE indicadores SET "projetoId" = $1, "metaId" = $2, nome = $3, "metaIndicadorCentavos" = $4, unidade = $5, peso = $6,
+      "frequenciaAtualizacao" = $7, responsavel = $8, "atualizadoEm" = $9 WHERE id = $10
     `, [
-      nome || indicador.nome, metaCentavos, unidade || indicador.unidade,
+      novoProjetoId, resolvedMetaId, nome || indicador.nome, metaCentavos, unidade || indicador.unidade,
       peso ?? indicador.peso, frequenciaAtualizacao || indicador.frequenciaAtualizacao,
       responsavel || indicador.responsavel, now, indicador.id,
     ]);

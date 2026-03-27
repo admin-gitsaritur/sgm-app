@@ -11,7 +11,8 @@ import type { Projeto, Meta } from '../types/index.js';
 export const projetosRouter = Router();
 projetosRouter.use(authenticate);
 
-async function recalcularPesos(metaId: string) {
+async function recalcularPesos(metaId: string | null) {
+  if (!metaId) return;
   const result = await query(
     'SELECT id, "contribuicaoEsperadaCentavos" FROM projetos WHERE "metaId" = $1 AND "deletedAt" IS NULL AND status != $2',
     [metaId, 'CANCELADO']
@@ -33,11 +34,17 @@ projetosRouter.get('/', async (req: AuthRequest, res) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
   const offset = (page - 1) * limit;
   const metaId = req.query.metaId as string;
+  const avulsos = req.query.avulsos as string;
 
   let where = 'p."deletedAt" IS NULL';
   const params: unknown[] = [];
   let idx = 1;
-  if (metaId) { where += ` AND p."metaId" = $${idx++}`; params.push(metaId); }
+
+  if (avulsos === 'true') {
+    where += ` AND p."metaId" IS NULL`;
+  } else if (metaId) { 
+    where += ` AND p."metaId" = $${idx++}`; params.push(metaId); 
+  }
 
   try {
     const totalResult = await query(`SELECT COUNT(*) as count FROM projetos p WHERE ${where}`, params);
@@ -77,17 +84,20 @@ projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoS
   const { metaId, nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis } = req.body;
 
   try {
-    const metaResult = await query('SELECT * FROM metas WHERE id = $1 AND "deletedAt" IS NULL', [metaId]);
-    if (metaResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
-    const meta = metaResult.rows[0] as Meta;
+    let meta = null;
+    if (metaId) {
+      const metaResult = await query('SELECT * FROM metas WHERE id = $1 AND "deletedAt" IS NULL', [metaId]);
+      if (metaResult.rows.length === 0) return res.status(404).json({ success: false, error: 'Meta não encontrada' });
+      meta = metaResult.rows[0] as Meta;
+    }
 
     const contribuicaoCentavos = Math.round(contribuicaoEsperada * 100);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // Se prazo não foi informado, usa o da meta
-    const pInicio = prazoInicio || meta.periodoInicio || null;
-    const pFim = prazoFim || meta.periodoFim || null;
+    // Se prazo não foi informado, usa o da meta (se existir)
+    const pInicio = prazoInicio || (meta ? meta.periodoInicio : null);
+    const pFim = prazoFim || (meta ? meta.periodoFim : null);
 
     const client = await pool.connect();
     try {
@@ -95,7 +105,7 @@ projetosRouter.post('/', authorize(['ADMIN', 'GESTOR']), validate(createProjetoS
       await client.query(`
         INSERT INTO projetos (id, "metaId", nome, "contribuicaoEsperadaCentavos", "pesoAutomatico", "prazoInicio", "prazoFim", "responsavelPrincipal", responsaveis, status, "criadoPor", "criadoEm", "atualizadoEm")
         VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, $12)
-      `, [id, metaId, nome, contribuicaoCentavos, pInicio, pFim, responsavelPrincipal || null, JSON.stringify(responsaveis || []), 'NAO_INICIADO', req.user!.id, now, now]);
+      `, [id, metaId || null, nome, contribuicaoCentavos, pInicio, pFim, responsavelPrincipal || null, JSON.stringify(responsaveis || []), 'NAO_INICIADO', req.user!.id, now, now]);
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK');
@@ -120,15 +130,17 @@ projetosRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateProjet
     const projeto = result.rows[0];
     if (!projeto) return res.status(404).json({ success: false, error: 'Projeto não encontrado' });
 
-    const { nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis, status } = req.body;
+    const metaIdAtual = projeto.metaId;
+    const { metaId, nome, contribuicaoEsperada, prazoInicio, prazoFim, responsavelPrincipal, responsaveis, status } = req.body;
     const now = new Date().toISOString();
     const contribuicaoCentavos = contribuicaoEsperada !== undefined ? Math.round(contribuicaoEsperada * 100) : projeto.contribuicaoEsperadaCentavos;
+    const novoMetaId = metaId !== undefined ? (metaId || null) : projeto.metaId;
 
     await query(`
-      UPDATE projetos SET nome = $1, "contribuicaoEsperadaCentavos" = $2, "prazoInicio" = $3, "prazoFim" = $4,
-      "responsavelPrincipal" = $5, responsaveis = $6, status = $7, "atualizadoEm" = $8 WHERE id = $9
+      UPDATE projetos SET "metaId" = $1, nome = $2, "contribuicaoEsperadaCentavos" = $3, "prazoInicio" = $4, "prazoFim" = $5,
+      "responsavelPrincipal" = $6, responsaveis = $7, status = $8, "atualizadoEm" = $9 WHERE id = $10
     `, [
-      nome || projeto.nome, contribuicaoCentavos,
+      novoMetaId, nome || projeto.nome, contribuicaoCentavos,
       prazoInicio !== undefined ? prazoInicio : projeto.prazoInicio,
       prazoFim !== undefined ? prazoFim : projeto.prazoFim,
       responsavelPrincipal !== undefined ? responsavelPrincipal : projeto.responsavelPrincipal,
@@ -136,8 +148,9 @@ projetosRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateProjet
       status || projeto.status, now, projeto.id,
     ]);
 
-    if (contribuicaoEsperada !== undefined) {
-      await recalcularPesos(projeto.metaId);
+    if (metaIdAtual !== novoMetaId || contribuicaoEsperada !== undefined) {
+      if (metaIdAtual) await recalcularPesos(metaIdAtual);
+      if (novoMetaId && novoMetaId !== metaIdAtual) await recalcularPesos(novoMetaId);
     }
 
     await logAudit(req.user!.id, 'UPDATE', 'Projeto', projeto.id, projeto, req.body, req.ip, req.headers['user-agent']);

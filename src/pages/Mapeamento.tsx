@@ -46,6 +46,14 @@ const LAYER_CONFIG = {
     icon: BarChart2,
     shadow: '0 8px 32px rgba(5,150,105,0.3)',
   },
+  avulso: {
+    bg: 'linear-gradient(135deg, #78716C 0%, #57534E 100%)',
+    border: '#44403C',
+    text: '#fff',
+    badge: 'Avulsos',
+    icon: BarChart2,
+    shadow: '0 8px 32px rgba(120,113,108,0.3)',
+  },
 };
 
 // ── Custom Node Component ──
@@ -188,30 +196,45 @@ function buildLayout(metas: any[], projetos: any[], indicadores: any[]) {
   const NODE_W = 260, GAP_X = 40;
 
   const projByMeta: Record<string, any[]> = {};
+  const projsAvulsos: any[] = [];
   projetos.forEach(p => {
-    const k = p.metaId || '__none__';
-    if (!projByMeta[k]) projByMeta[k] = [];
-    projByMeta[k].push(p);
+    if (p.metaId) {
+      if (!projByMeta[p.metaId]) projByMeta[p.metaId] = [];
+      projByMeta[p.metaId].push(p);
+    } else {
+      projsAvulsos.push(p);
+    }
   });
 
   const indByProj: Record<string, any[]> = {};
+  const indDiretosByMeta: Record<string, any[]> = {};
+  const indsAvulsos: any[] = [];
+
   indicadores.forEach(ind => {
-    const k = ind.projetoId || '__none__';
-    if (!indByProj[k]) indByProj[k] = [];
-    indByProj[k].push(ind);
+    if (ind.projetoId) {
+      if (!indByProj[ind.projetoId]) indByProj[ind.projetoId] = [];
+      indByProj[ind.projetoId].push(ind);
+    } else if (ind.metaId) {
+      if (!indDiretosByMeta[ind.metaId]) indDiretosByMeta[ind.metaId] = [];
+      indDiretosByMeta[ind.metaId].push(ind);
+    } else {
+      indsAvulsos.push(ind);
+    }
   });
 
   let globalX = 80;
 
   metas.forEach(meta => {
     const metaProjs = projByMeta[meta.id] || [];
+    const metaInds = indDiretosByMeta[meta.id] || [];
     let totalInds = 0;
     metaProjs.forEach(proj => { totalInds += Math.max((indByProj[proj.id] || []).length, 1); });
 
     const subtreeWidth = Math.max(
       NODE_W,
       Math.max(metaProjs.length, 1) * (NODE_W + GAP_X) - GAP_X,
-      totalInds * (NODE_W + GAP_X) - GAP_X
+      totalInds * (NODE_W + GAP_X) - GAP_X,
+      metaInds.length * (NODE_W + GAP_X) - GAP_X
     );
 
     const metaId = `meta-${meta.id}`;
@@ -264,8 +287,114 @@ function buildLayout(metas: any[], projetos: any[], indicadores: any[]) {
       });
     });
 
+    const metaIndStartX = globalX + (subtreeWidth - (metaInds.length * (NODE_W + GAP_X) - GAP_X)) / 2;
+    metaInds.forEach((ind, ii) => {
+      const indId = `ind-meta-${ind.id}`;
+      const indX = metaIndStartX + ii * (NODE_W + GAP_X);
+      const indPct = ind.metaIndicadorCentavos > 0
+        ? ((ind.realizadoCentavos || 0) / ind.metaIndicadorCentavos * 100).toFixed(1) : '0.0';
+
+      nodes.push({
+        id: indId, type: 'flowNode',
+        position: saved[indId] || { x: indX, y: IND_Y },
+        data: { label: ind.nome, subtitle: ind.statusAtualizacao || '—', layer: 'indicador', progress: parseFloat(indPct) },
+      });
+      edges.push({
+        id: `e-${metaId}-${indId}`, source: metaId, target: indId,
+        type: 'smoothstep', animated: true,
+        style: { stroke: '#F37137', strokeWidth: 2, opacity: 0.6 },
+      });
+    });
+
     globalX += subtreeWidth + 120;
   });
+
+  if (indsAvulsos.length > 0 || projsAvulsos.length > 0) {
+    const avulsoStartX = globalX;
+
+    let totalAvulsosIndsViaProj = 0;
+    projsAvulsos.forEach(proj => { totalAvulsosIndsViaProj += Math.max((indByProj[proj.id] || []).length, 1); });
+
+    const avulsoSubtreeWidth = Math.max(
+      NODE_W,
+      projsAvulsos.length > 0 ? (projsAvulsos.length * (NODE_W + GAP_X) - GAP_X) : 0,
+      totalAvulsosIndsViaProj * (NODE_W + GAP_X) - GAP_X,
+      indsAvulsos.length * (NODE_W + GAP_X) - GAP_X
+    );
+
+    const pseudoMetaId = 'meta-avulsos';
+    nodes.push({
+      id: pseudoMetaId, type: 'flowNode',
+      position: saved[pseudoMetaId] || { x: avulsoStartX + avulsoSubtreeWidth / 2 - NODE_W / 2, y: META_Y },
+      data: { label: 'Estruturas Avulsas', subtitle: 'Não vinculadas a metas', layer: 'avulso' },
+    });
+
+    // Draw avulso projects
+    if (projsAvulsos.length > 0) {
+      const projStartX = avulsoStartX + (avulsoSubtreeWidth - (projsAvulsos.length * (NODE_W + GAP_X) - GAP_X)) / 2;
+
+      projsAvulsos.forEach((proj, pi) => {
+        const projX = projStartX + pi * (NODE_W + GAP_X);
+        const projId = `proj-${proj.id}`;
+
+        nodes.push({
+          id: projId, type: 'flowNode',
+          position: saved[projId] || { x: projX, y: PROJ_Y },
+          data: { label: proj.nome, subtitle: proj.responsavelPrincipalNome || '—', layer: 'projeto' },
+        });
+        edges.push({
+          id: `e-${pseudoMetaId}-${projId}`, source: pseudoMetaId, target: projId,
+          type: 'smoothstep', animated: true,
+          style: { stroke: '#78716C', strokeWidth: 2, opacity: 0.6 },
+        });
+
+        const projInds = indByProj[proj.id] || [];
+        const projIndStartX = projX - ((projInds.length - 1) * (NODE_W + GAP_X)) / 2;
+
+        projInds.forEach((ind, ii) => {
+          const indId = `ind-${ind.id}`;
+          const indX = projIndStartX + ii * (NODE_W + GAP_X);
+          const indPct = ind.metaIndicadorCentavos > 0
+            ? ((ind.realizadoCentavos || 0) / ind.metaIndicadorCentavos * 100).toFixed(1) : '0.0';
+
+          nodes.push({
+            id: indId, type: 'flowNode',
+            position: saved[indId] || { x: indX, y: IND_Y },
+            data: { label: ind.nome, subtitle: ind.statusAtualizacao || '—', layer: 'indicador', progress: parseFloat(indPct) },
+          });
+          edges.push({
+            id: `e-${projId}-${indId}`, source: projId, target: indId,
+            type: 'smoothstep', animated: true,
+            style: { stroke: '#4E3205', strokeWidth: 2, opacity: 0.5 },
+          });
+        });
+      });
+    }
+
+    // Draw avulso indicators directly under pseudo-meta
+    if (indsAvulsos.length > 0) {
+      const indStartX = avulsoStartX + (avulsoSubtreeWidth - (indsAvulsos.length * (NODE_W + GAP_X) - GAP_X)) / 2;
+      indsAvulsos.forEach((ind, i) => {
+        const indId = `ind-avulso-${ind.id}`;
+        const indX = indStartX + i * (NODE_W + GAP_X);
+        const indPct = ind.metaIndicadorCentavos > 0
+          ? ((ind.realizadoCentavos || 0) / ind.metaIndicadorCentavos * 100).toFixed(1) : '0.0';
+
+        nodes.push({
+          id: indId, type: 'flowNode',
+          position: saved[indId] || { x: indX, y: IND_Y },
+          data: { label: ind.nome, subtitle: ind.statusAtualizacao || '—', layer: 'indicador', progress: parseFloat(indPct) },
+        });
+        edges.push({
+          id: `e-${pseudoMetaId}-${indId}`, source: pseudoMetaId, target: indId,
+          type: 'smoothstep', animated: true,
+          style: { stroke: '#78716C', strokeWidth: 2, opacity: 0.5 },
+        });
+      });
+    }
+    
+    globalX += avulsoSubtreeWidth + 120;
+  }
 
   return { nodes, edges };
 }
@@ -373,7 +502,7 @@ export const Mapeamento = () => {
             <MiniMap
               nodeColor={(n) => {
                 const l = n.data?.layer as string;
-                return l === 'meta' ? '#F37137' : l === 'projeto' ? '#4E3205' : l === 'indicador' ? '#059669' : '#a8a29e';
+                return l === 'meta' ? '#F37137' : l === 'projeto' ? '#4E3205' : l === 'indicador' ? '#059669' : l === 'avulso' ? '#78716C' : '#a8a29e';
               }}
               style={{ borderRadius: 12, border: '1px solid #e7e5e4', overflow: 'hidden' }}
               maskColor="rgba(0,0,0,0.08)"

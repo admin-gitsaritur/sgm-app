@@ -184,9 +184,9 @@ async function gerarDadosRelatorio(mes: number, ano: number) {
 
     // Projetos abaixo de 85%
     const projAbaixoResult = await query(
-        `SELECT p.*, m.nome as "metaNome" FROM projetos p
-     JOIN metas m ON p."metaId" = m.id
-     WHERE p."deletedAt" IS NULL AND m."deletedAt" IS NULL AND m.ano = $1`,
+        `SELECT p.*, COALESCE(m.nome, 'Projeto Avulso') as "metaNome" FROM projetos p
+     LEFT JOIN metas m ON p."metaId" = m.id
+     WHERE p."deletedAt" IS NULL AND (p."metaId" IS NULL OR (m."deletedAt" IS NULL AND m.ano = $1))`,
         [ano]
     );
 
@@ -213,8 +213,8 @@ async function gerarDadosRelatorio(mes: number, ano: number) {
         `SELECT i.nome, i."statusAtualizacao", u.nome as "responsavelNome", p.nome as "projetoNome"
      FROM indicadores i
      JOIN users u ON i.responsavel = u.id
-     JOIN projetos p ON i."projetoId" = p.id
-     WHERE i."statusAtualizacao" = 'ATRASADO' AND i."deletedAt" IS NULL AND p."deletedAt" IS NULL`
+     LEFT JOIN projetos p ON i."projetoId" = p.id
+     WHERE i."statusAtualizacao" = 'ATRASADO' AND i."deletedAt" IS NULL AND (p."deletedAt" IS NULL OR i."projetoId" IS NULL)`
     );
 
     // Piores performances

@@ -46,7 +46,10 @@ export const Projetos = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const metaParam = filterMetaId && filterMetaId !== '__ALL__' ? `?metaId=${filterMetaId}` : '';
+      let metaParam = '';
+      if (filterMetaId === '__AVULSOS__') metaParam = '?avulsos=true';
+      else if (filterMetaId && filterMetaId !== '__ALL__') metaParam = `?metaId=${filterMetaId}`;
+      
       const [projRes, metaRes] = await Promise.all([
         api(`/projetos${metaParam}`),
         api('/metas'),
@@ -106,7 +109,7 @@ export const Projetos = () => {
       header: 'Meta',
       hiddenOnMobile: true,
       render: (_: unknown, row: any) => (
-        <CellText variant="muted">{row.metaNome || getMetaNome(row.metaId)}</CellText>
+        <CellText variant="muted">{row.metaNome || getMetaNome(row.metaId) || 'Projeto Avulso'}</CellText>
       ),
       cellVariant: 'none' as const,
     },
@@ -157,7 +160,7 @@ export const Projetos = () => {
   const openEdit = (p: any) => {
     setEditingProjeto(p);
     setForm({
-      metaId: p.metaId, nome: p.nome,
+      metaId: p.metaId || '', nome: p.nome,
       contribuicaoEsperada: (p.contribuicaoEsperadaCentavos / 100).toString(),
     });
     setIsModalOpen(true);
@@ -166,11 +169,12 @@ export const Projetos = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const body = {
+      const body: any = {
         metaId: form.metaId,
         nome: form.nome,
         contribuicaoEsperada: parseFloat(form.contribuicaoEsperada),
       };
+      if (!body.metaId) delete body.metaId;
       if (editingProjeto) {
         await api(`/projetos/${editingProjeto.id}`, { method: 'PUT', body: JSON.stringify(body) });
       } else {
@@ -237,7 +241,8 @@ export const Projetos = () => {
                   <SelectValue placeholder="Filtrar por meta" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__ALL__">Todas as metas</SelectItem>
+                  <SelectItem value="__ALL__">Todos os projetos</SelectItem>
+                  <SelectItem value="__AVULSOS__">Projetos Avulsos</SelectItem>
                   {metas.map((m: any) => (
                     <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
                   ))}
@@ -271,10 +276,11 @@ export const Projetos = () => {
       >
         <div className="space-y-5">
 
-          <FormField label="Meta vinculada">
-            <Select value={form.metaId} onValueChange={v => setForm({ ...form, metaId: v })}>
+          <FormField label="Meta vinculada (opcional)">
+            <Select value={form.metaId || 'none'} onValueChange={v => setForm({ ...form, metaId: v === 'none' ? '' : v })}>
               <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">-- Sem vínculo com meta --</SelectItem>
                 {metas.map((m: any) => (
                   <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
                 ))}

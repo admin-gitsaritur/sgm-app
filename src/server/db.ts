@@ -88,7 +88,7 @@ export async function initDb() {
 
       CREATE TABLE IF NOT EXISTS projetos (
         id TEXT PRIMARY KEY,
-        "metaId" TEXT NOT NULL REFERENCES metas(id),
+        "metaId" TEXT REFERENCES metas(id),
         nome TEXT NOT NULL,
         "contribuicaoEsperadaCentavos" BIGINT NOT NULL,
         "pesoAutomatico" DOUBLE PRECISION NOT NULL,
@@ -105,7 +105,8 @@ export async function initDb() {
 
       CREATE TABLE IF NOT EXISTS indicadores (
         id TEXT PRIMARY KEY,
-        "projetoId" TEXT NOT NULL REFERENCES projetos(id),
+        "projetoId" TEXT REFERENCES projetos(id),
+        "metaId" TEXT REFERENCES metas(id),
         nome TEXT NOT NULL,
         "metaIndicadorCentavos" BIGINT NOT NULL,
         "realizadoCentavos" BIGINT NOT NULL DEFAULT 0,
@@ -159,6 +160,9 @@ export async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_auditoria_timestamp ON auditoria("timestamp");
       CREATE INDEX IF NOT EXISTS idx_auditoria_user ON auditoria("userId");
       CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade, "entidadeId");
+      CREATE INDEX IF NOT EXISTS idx_indicadores_meta_direta ON indicadores("metaId");
+      CREATE INDEX IF NOT EXISTS idx_indicadores_avulsos ON indicadores("projetoId") WHERE "projetoId" IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_projetos_avulsos ON projetos("metaId") WHERE "metaId" IS NULL;
     `);
 
     // ── Trigger: auditoria imutável ──
@@ -185,6 +189,19 @@ export async function initDb() {
     await client.query(`
       ALTER TABLE users ALTER COLUMN cpf DROP NOT NULL;
 
+      -- Indicadores: projetoId agora é opcional
+      ALTER TABLE indicadores ALTER COLUMN "projetoId" DROP NOT NULL;
+
+      -- Novo campo: vínculo direto indicador → meta (sem projeto)
+      DO $$ BEGIN
+          IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = 'indicadores' AND column_name = 'metaId'
+          ) THEN
+              ALTER TABLE indicadores ADD COLUMN "metaId" TEXT REFERENCES metas(id);
+          END IF;
+      END $$;
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='metas' AND column_name='unidadeMeta') THEN
           ALTER TABLE metas ADD COLUMN "unidadeMeta" TEXT NOT NULL DEFAULT 'BRL';
@@ -206,6 +223,9 @@ export async function initDb() {
       ALTER TABLE projetos ALTER COLUMN "prazoFim" DROP NOT NULL;
       ALTER TABLE projetos ALTER COLUMN "responsavelPrincipal" DROP NOT NULL;
       ALTER TABLE projetos ALTER COLUMN responsaveis SET DEFAULT '[]';
+      
+      -- Fase 2: Projetos: metaId agora é opcional (Projetos Avulsos)
+      ALTER TABLE projetos ALTER COLUMN "metaId" DROP NOT NULL;
     `);
 
     await client.query('COMMIT');

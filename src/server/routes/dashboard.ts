@@ -70,6 +70,16 @@ dashboardRouter.get('/', async (req: AuthRequest, res) => {
                 });
             }
 
+            const indicadoresDiretosResult = await query(
+                'SELECT * FROM indicadores WHERE "metaId" = $1 AND "projetoId" IS NULL AND "deletedAt" IS NULL',
+                [meta.id]
+            );
+            const indicadoresDiretos = indicadoresDiretosResult.rows as Indicador[];
+
+            for (const ind of indicadoresDiretos) {
+                realizadoAcumuladoCentavos += ind.realizadoCentavos;
+            }
+
             const curvaPersonalizadaCentavos = meta.curvaPersonalizada
                 ? (typeof meta.curvaPersonalizada === 'string'
                     ? JSON.parse(meta.curvaPersonalizada)
@@ -132,7 +142,80 @@ dashboardRouter.get('/', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({ success: true, data: result });
+        const avulsosResult = await query(`
+            SELECT * FROM indicadores 
+            WHERE "projetoId" IS NULL AND "metaId" IS NULL AND "deletedAt" IS NULL
+        `);
+        const avulsosList = avulsosResult.rows as Indicador[];
+
+        let avulsosRealizadoTotal = 0;
+        let avulsosMetaTotal = 0;
+        let avulsosAtrasados = 0;
+        const dashboardAvulsos = avulsosList.map(ind => {
+            const pct = ind.metaIndicadorCentavos > 0
+                ? (ind.realizadoCentavos / ind.metaIndicadorCentavos) * 100 : 0;
+            avulsosRealizadoTotal += ind.realizadoCentavos;
+            avulsosMetaTotal += ind.metaIndicadorCentavos;
+            if (ind.statusAtualizacao === 'ATRASADO' || ind.statusAtualizacao === 'PENDENTE') {
+                avulsosAtrasados++;
+            }
+            return { indicador: ind, percentualAtingido: pct };
+        });
+
+        // Projetos Avulsos
+        const projetosAvulsosResult = await query(`
+            SELECT * FROM projetos WHERE "metaId" IS NULL AND "deletedAt" IS NULL
+        `);
+        const projetosAvulsos = projetosAvulsosResult.rows as Projeto[];
+
+        const dashboardProjetosAvulsos = [];
+        for (const projeto of projetosAvulsos) {
+            const indicadoresResult = await query(
+                'SELECT * FROM indicadores WHERE "projetoId" = $1 AND "deletedAt" IS NULL',
+                [projeto.id]
+            );
+            const indsProj = indicadoresResult.rows as Indicador[];
+            
+            let pesoTotal = 0;
+            let percentualPonderado = 0;
+            let pjAtrasados = 0;
+
+            const dInds = indsProj.map(ind => {
+                const percentualAtingido = ind.metaIndicadorCentavos > 0
+                    ? (ind.realizadoCentavos / ind.metaIndicadorCentavos) * 100 : 0;
+                pesoTotal += ind.peso;
+                percentualPonderado += ind.peso * (percentualAtingido / 100);
+                if (ind.statusAtualizacao === 'ATRASADO' || ind.statusAtualizacao === 'PENDENTE') pjAtrasados++;
+                return { indicador: ind, percentualAtingido };
+            });
+
+            const percentualExecucao = pesoTotal > 0 ? (percentualPonderado / pesoTotal) * 100 : 0;
+            const contribuicaoRealEstimadaCentavos = Math.round(
+                projeto.contribuicaoEsperadaCentavos * (percentualExecucao / 100)
+            );
+
+            dashboardProjetosAvulsos.push({
+                projeto,
+                percentualExecucao,
+                contribuicaoRealEstimadaCentavos,
+                indicadores: dInds,
+                indicadoresAtrasados: pjAtrasados,
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            data: result,
+            avulsos: {
+                projetos: dashboardProjetosAvulsos,
+                indicadores: dashboardAvulsos,
+                realizadoTotalCentavos: avulsosRealizadoTotal,
+                metaTotalCentavos: avulsosMetaTotal,
+                percentualMedio: avulsosMetaTotal > 0
+                    ? (avulsosRealizadoTotal / avulsosMetaTotal) * 100 : 0,
+                indicadoresAtrasados: avulsosAtrasados,
+            }
+        });
     } catch (err) {
         console.error('Erro no dashboard:', err);
         res.status(500).json({ success: false, error: 'Erro interno' });

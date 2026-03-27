@@ -5,7 +5,7 @@ import { CardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import {
   Target, TrendingUp, AlertTriangle, DollarSign,
-  BarChart2, ChevronRight, RefreshCw, Gauge
+  BarChart2, ChevronRight, RefreshCw, Gauge, Briefcase
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -102,6 +102,7 @@ const semaforoColor = (s: string) =>
 
 export const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState<any[]>([]);
+  const [avulsosData, setAvulsosData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -110,7 +111,10 @@ export const Dashboard = () => {
     setError('');
     try {
       const res = await api('/dashboard');
-      if (res.success) setDashboardData(res.data);
+      if (res.success) {
+        setDashboardData(res.data);
+        setAvulsosData(res.avulsos);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -455,6 +459,118 @@ export const Dashboard = () => {
           )}
         </div>
       ))}
+
+      {/* ── Projetos Avulsos ── */}
+      {avulsosData && avulsosData.projetos && avulsosData.projetos.length > 0 && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 overflow-hidden">
+            <div className="p-6 flex items-center justify-between flex-wrap gap-4 border-b border-stone-100">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-6 h-6 text-stone-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-brown flex items-center gap-2">
+                    Projetos Avulsos
+                  </h2>
+                  <p className="text-sm text-brown/50">Projetos independentes de metas estratégicas</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-stone-50/50 border-b border-stone-100">
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Projeto</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Execução</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Ind. Atrasados</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-50">
+                  {avulsosData.projetos.map((p: any) => (
+                    <tr key={p.projeto.id} className="hover:bg-stone-50/50 transition-colors">
+                      <td className="px-6 py-3.5 text-sm font-medium text-brown">{p.projeto.nome}</td>
+                      <td className="px-6 py-3.5 text-sm">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-24 bg-stone-100 rounded-full h-2">
+                            <div
+                              className="bg-primary h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(p.percentualExecucao, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-brown/60">{p.percentualExecucao.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3.5 text-sm">
+                        {p.indicadoresAtrasados > 0 ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-rose-50 text-rose-600 text-xs font-bold">
+                            {p.indicadoresAtrasados}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold">0</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5"><StatusBadge status={p.projeto.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Indicadores Avulsos ── */}
+      {avulsosData && avulsosData.indicadores && avulsosData.indicadores.length > 0 && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(78,50,5,0.04)] border border-stone-100/50 overflow-hidden">
+            <div className="p-6 flex items-center justify-between flex-wrap gap-4 border-b border-stone-100">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
+                  <BarChart2 className="w-6 h-6 text-stone-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-brown flex items-center gap-2">
+                    Indicadores Avulsos
+                  </h2>
+                  <p className="text-sm text-brown/50">Não vinculados a projetos ou metas</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-stone-50/50 border-b border-stone-100">
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Indicador</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Meta</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Realizado</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">% Atingido</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-brown/50 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-50">
+                  {avulsosData.indicadores.map((item: any) => (
+                    <tr key={item.indicador.id} className="hover:bg-stone-50/50 transition-colors">
+                      <td className="px-6 py-3.5 text-sm font-medium text-brown">{item.indicador.nome}</td>
+                      <td className="px-6 py-3.5 text-sm text-brown">{formatCurrency(item.indicador.metaIndicadorCentavos)}</td>
+                      <td className="px-6 py-3.5 text-sm text-brown">{formatCurrency(item.indicador.realizadoCentavos)}</td>
+                      <td className="px-6 py-3.5 text-sm">
+                        <span className="text-xs font-bold text-brown mr-2">{item.percentualAtingido.toFixed(1)}%</span>
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <StatusBadge status={item.indicador.statusAtualizacao} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -70,6 +70,7 @@ const getPercent = (ind: any) =>
 export const Indicadores = () => {
   const [indicadores, setIndicadores] = useState<any[]>([]);
   const [projetos, setProjetos] = useState<any[]>([]);
+  const [metas, setMetas] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,7 +87,7 @@ export const Indicadores = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [form, setForm] = useState({
-    projetoId: '', nome: '', metaIndicador: '', unidade: 'BRL',
+    projetoId: '', metaId: '', nome: '', metaIndicador: '', unidade: 'BRL',
     peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '',
     tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') as string[],
   });
@@ -96,15 +97,19 @@ export const Indicadores = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const filterParam = filterProjetoId && filterProjetoId !== '__ALL__'
-        ? `?projetoId=${filterProjetoId}` : '';
-      const [indRes, projRes, userRes] = await Promise.all([
+      let filterParam = '';
+      if (filterProjetoId === '__AVULSOS__') filterParam = '?avulsos=true';
+      else if (filterProjetoId && filterProjetoId !== '__ALL__') filterParam = `?projetoId=${filterProjetoId}`;
+
+      const [indRes, projRes, metaRes, userRes] = await Promise.all([
         api(`/indicadores${filterParam}`),
         api('/projetos'),
+        api('/metas'),
         api('/usuarios'),
       ]);
       if (indRes.success) setIndicadores(indRes.data);
       if (projRes.success) setProjetos(projRes.data);
+      if (metaRes.success) setMetas(metaRes.data);
       if (userRes.success) setUsuarios(userRes.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -143,14 +148,14 @@ export const Indicadores = () => {
   // ── CRUD handlers ──
   const openCreate = () => {
     setEditingIndicador(null);
-    setForm({ projetoId: '', nome: '', metaIndicador: '', unidade: 'BRL', peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '', tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') });
+    setForm({ projetoId: '', metaId: '', nome: '', metaIndicador: '', unidade: 'BRL', peso: '', frequenciaAtualizacao: 'MENSAL', responsavel: '', tipoCurva: 'LINEAR', curvaPersonalizada: Array(12).fill('') });
     setIsModalOpen(true);
   };
 
   const openEdit = (ind: any) => {
     setEditingIndicador(ind);
     setForm({
-      projetoId: ind.projetoId, nome: ind.nome,
+      projetoId: ind.projetoId || '', metaId: ind.metaId || '', nome: ind.nome,
       metaIndicador: (ind.metaIndicadorCentavos / 100).toString(),
       unidade: ind.unidade || 'BRL', peso: ind.peso.toString(),
       frequenciaAtualizacao: ind.frequenciaAtualizacao, responsavel: ind.responsavel,
@@ -163,7 +168,9 @@ export const Indicadores = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const body = { ...form, metaIndicador: parseFloat(form.metaIndicador), peso: parseFloat(form.peso) };
+      const body: any = { ...form, metaIndicador: parseFloat(form.metaIndicador), peso: parseFloat(form.peso || '0') };
+      if (!body.projetoId) delete body.projetoId;
+      if (!body.metaId) delete body.metaId;
       if (editingIndicador) {
         await api(`/indicadores/${editingIndicador.id}`, { method: 'PUT', body: JSON.stringify(body) });
         toast.success({ title: 'Indicador atualizado!' });
@@ -209,7 +216,9 @@ export const Indicadores = () => {
           <IconBadge icon={<BarChart2 className="w-4 h-4" />} theme="emerald" />
           <div>
             <DataTableCellPrimary>{row.nome}</DataTableCellPrimary>
-            <CellText variant="muted" className="text-xs">{row.projetoNome || '—'}</CellText>
+            <CellText variant="muted" className="text-xs">
+              {row.projetoNome ? row.projetoNome : (row.metaNome ? `Meta: ${row.metaNome}` : 'Indicador Avulso')}
+            </CellText>
           </div>
         </div>
       ),
@@ -378,7 +387,8 @@ export const Indicadores = () => {
                   <SelectValue placeholder="Filtrar por projeto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__ALL__">Todos os projetos</SelectItem>
+                  <SelectItem value="__ALL__">Todos os indicadores</SelectItem>
+                  <SelectItem value="__AVULSOS__">Indicadores Avulsos / Meta</SelectItem>
                   {projetos.map((p: any) => (
                     <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
                   ))}
@@ -411,18 +421,35 @@ export const Indicadores = () => {
         }
       >
         <div className="space-y-4">
-          <FormField label="Projeto">
-            <Select value={form.projetoId} onValueChange={v => setForm({ ...form, projetoId: v })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o projeto..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projetos.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Vincular a Meta (opcional)">
+              <Select value={form.metaId || 'none'} onValueChange={v => setForm({ ...form, metaId: v === 'none' ? '' : v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem vínculo de meta direto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Sem vínculo de meta direto --</SelectItem>
+                  {metas.map((m: any) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            
+            <FormField label="Vincular a Projeto (opcional)">
+              <Select value={form.projetoId || 'none'} onValueChange={v => setForm({ ...form, projetoId: v === 'none' ? '' : v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem vínculo de projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Sem vínculo de projeto --</SelectItem>
+                  {projetos.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
 
           <FormField label="Nome do Indicador">
             <Input
@@ -456,7 +483,7 @@ export const Indicadores = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Peso (0 a 1)">
+            <FormField label={form.projetoId ? 'Peso no Projeto (0 a 1)' : 'Peso (opcional)'}>
               <Input
                 type="number" step="0.01" min="0" max="1"
                 value={form.peso}

@@ -5,7 +5,7 @@ import { z } from 'zod';
 export const createMetaSchema = z.object({
     nome: z.string().min(3, 'Mínimo 3 caracteres').max(200).trim(),
     valorMeta: z.number().positive('Deve ser positivo').finite(),
-    unidadeMeta: z.enum(['BRL', 'PERCENTUAL', 'UNIDADE']).default('BRL'),
+    unidadeMeta: z.enum(['BRL', 'PERCENTUAL', 'UNIDADE', 'KM']).default('BRL'),
     ano: z.number().int().min(2020).max(2100),
     periodoInicio: z.string().min(1, 'Obrigatório'),
     periodoFim: z.string().min(1, 'Obrigatório'),
@@ -22,7 +22,7 @@ export const updateMetaSchema = createMetaSchema.partial().extend({
 // ── Projeto Schemas ───────────────────────────────────────
 
 export const createProjetoSchema = z.object({
-    metaId: z.string().uuid('ID de meta inválido'),
+    metaId: z.string().uuid('ID de meta inválido').optional().nullable(),
     nome: z.string().min(3).max(200).trim(),
     contribuicaoEsperada: z.number().positive('Deve ser positivo').finite(),
     prazoInicio: z.string().optional().nullable(),
@@ -38,7 +38,8 @@ export const updateProjetoSchema = createProjetoSchema.partial().extend({
 // ── Indicador Schemas ─────────────────────────────────────
 
 export const createIndicadorSchema = z.object({
-    projetoId: z.string().uuid('ID de projeto inválido'),
+    projetoId: z.string().uuid('ID de projeto inválido').optional().nullable(),
+    metaId: z.string().uuid('ID de meta inválido').optional().nullable(),
     nome: z.string().min(3).max(200).trim(),
     metaIndicador: z.number().positive('Deve ser positivo').finite(),
     unidade: z.string().min(1).max(50).trim(),

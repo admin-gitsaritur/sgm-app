@@ -20,7 +20,7 @@ export interface Meta {
 
 export interface Projeto {
     id: string;
-    metaId: string;
+    metaId: string | null;
     nome: string;
     contribuicaoEsperadaCentavos: number;
     pesoAutomatico: number;
@@ -37,7 +37,8 @@ export interface Projeto {
 
 export interface Indicador {
     id: string;
-    projetoId: string;
+    projetoId: string | null;
+    metaId: string | null;
     nome: string;
     metaIndicadorCentavos: number;
     realizadoCentavos: number;
@@ -117,6 +118,15 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 }
 
 // ── Dashboard Types ───────────────────────────────────────
+
+export interface DashboardAvulsos {
+    indicadores: DashboardIndicador[];
+    projetos?: DashboardProjeto[]; // NEW
+    realizadoTotalCentavos: number;
+    metaTotalCentavos: number;
+    percentualMedio: number;
+    indicadoresAtrasados: number;
+}
 
 export interface DashboardMeta {
     meta: Meta;
