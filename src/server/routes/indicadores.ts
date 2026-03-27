@@ -177,9 +177,9 @@ indicadoresRouter.put('/:id', authorize(['ADMIN', 'GESTOR']), validate(updateInd
   }
 });
 
-// ── POST /:id/atualizar — Update realizado ────────────────
+// ── POST /:id/atualizar — Update realizado (with optional retroactive date) ──
 indicadoresRouter.post('/:id/atualizar', authorize(['ADMIN', 'GESTOR', 'OPERADOR']), validate(updateRealizadoSchema), async (req: AuthRequest, res) => {
-  const { realizado } = req.body;
+  const { realizado, data: dataRef } = req.body;
 
   try {
     const result = await query('SELECT * FROM indicadores WHERE id = $1 AND "deletedAt" IS NULL', [req.params.id]);
@@ -191,20 +191,28 @@ indicadoresRouter.post('/:id/atualizar', authorize(['ADMIN', 'GESTOR', 'OPERADOR
     }
 
     const realizadoCentavos = Math.round(realizado * 100);
+    const dataLancamento = dataRef || new Date().toISOString();
     const now = new Date().toISOString();
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`
-        INSERT INTO historico_indicadores (id, "indicadorId", data, "valorCentavos", "atualizadoPor")
-        VALUES ($1, $2, $3, $4, $5)
-      `, [crypto.randomUUID(), indicador.id, now, realizadoCentavos, req.user!.id]);
+      await client.query(
+        'INSERT INTO historico_indicadores (id, "indicadorId", data, "valorCentavos", "atualizadoPor") VALUES ($1, $2, $3, $4, $5)',
+        [crypto.randomUUID(), indicador.id, dataLancamento, realizadoCentavos, req.user!.id]
+      );
 
-      await client.query(`
-        UPDATE indicadores SET "realizadoCentavos" = $1, "dataUltimaAtualizacao" = $2, "statusAtualizacao" = 'ATUALIZADO', "atualizadoEm" = $3
-        WHERE id = $4
-      `, [realizadoCentavos, now, now, indicador.id]);
+      // Recalcula realizado como soma de todo o histórico
+      const somaResult = await client.query(
+        'SELECT COALESCE(SUM("valorCentavos"), 0) as total FROM historico_indicadores WHERE "indicadorId" = $1',
+        [indicador.id]
+      );
+      const totalRealizado = parseInt(somaResult.rows[0].total);
+
+      await client.query(
+        `UPDATE indicadores SET "realizadoCentavos" = $1, "dataUltimaAtualizacao" = $2, "statusAtualizacao" = 'ATUALIZADO', "atualizadoEm" = $3 WHERE id = $4`,
+        [totalRealizado, now, now, indicador.id]
+      );
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK');
@@ -213,9 +221,112 @@ indicadoresRouter.post('/:id/atualizar', authorize(['ADMIN', 'GESTOR', 'OPERADOR
       client.release();
     }
 
-    await logAudit(req.user!.id, 'UPDATE', 'Indicador', indicador.id, { realizado: indicador.realizadoCentavos }, { realizado: realizadoCentavos }, req.ip, req.headers['user-agent']);
+    await logAudit(req.user!.id, 'UPDATE', 'Indicador', indicador.id, { realizado: indicador.realizadoCentavos }, { realizado: realizadoCentavos, data: dataLancamento }, req.ip, req.headers['user-agent']);
     res.json({ success: true, data: { id: indicador.id } });
   } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── GET /:id/historico — List history entries ───────────────
+indicadoresRouter.get('/:id/historico', async (req: AuthRequest, res) => {
+  try {
+    const result = await query(
+      `SELECT h.*, u.nome as "atualizadoPorNome"
+       FROM historico_indicadores h
+       LEFT JOIN users u ON u.id = h."atualizadoPor"
+       WHERE h."indicadorId" = $1
+       ORDER BY h.data DESC`,
+      [req.params.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('Erro ao listar histórico:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── PUT /historico/:histId — Edit a history entry ───────────
+indicadoresRouter.put('/historico/:histId', authorize(['ADMIN', 'GESTOR']), async (req: AuthRequest, res) => {
+  const { realizado, data: dataRef } = req.body;
+  try {
+    const histResult = await query('SELECT * FROM historico_indicadores WHERE id = $1', [req.params.histId]);
+    const hist = histResult.rows[0];
+    if (!hist) return res.status(404).json({ success: false, error: 'Registro não encontrado' });
+
+    const valorCentavos = realizado !== undefined ? Math.round(realizado * 100) : hist.valorCentavos;
+    const dataFinal = dataRef || hist.data;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE historico_indicadores SET "valorCentavos" = $1, data = $2 WHERE id = $3',
+        [valorCentavos, dataFinal, hist.id]
+      );
+
+      // Recalcula realizado do indicador
+      const somaResult = await client.query(
+        'SELECT COALESCE(SUM("valorCentavos"), 0) as total FROM historico_indicadores WHERE "indicadorId" = $1',
+        [hist.indicadorId]
+      );
+      const totalRealizado = parseInt(somaResult.rows[0].total);
+      const now = new Date().toISOString();
+      await client.query(
+        'UPDATE indicadores SET "realizadoCentavos" = $1, "atualizadoEm" = $2 WHERE id = $3',
+        [totalRealizado, now, hist.indicadorId]
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    await logAudit(req.user!.id, 'UPDATE', 'HistoricoIndicador', hist.id, hist, { valorCentavos, data: dataFinal }, req.ip, req.headers['user-agent']);
+    res.json({ success: true, data: { id: hist.id } });
+  } catch (err) {
+    console.error('Erro ao editar histórico:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// ── DELETE /historico/:histId — Delete a history entry ──────
+indicadoresRouter.delete('/historico/:histId', authorize(['ADMIN', 'GESTOR']), async (req: AuthRequest, res) => {
+  try {
+    const histResult = await query('SELECT * FROM historico_indicadores WHERE id = $1', [req.params.histId]);
+    const hist = histResult.rows[0];
+    if (!hist) return res.status(404).json({ success: false, error: 'Registro não encontrado' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM historico_indicadores WHERE id = $1', [hist.id]);
+
+      // Recalcula realizado do indicador
+      const somaResult = await client.query(
+        'SELECT COALESCE(SUM("valorCentavos"), 0) as total FROM historico_indicadores WHERE "indicadorId" = $1',
+        [hist.indicadorId]
+      );
+      const totalRealizado = parseInt(somaResult.rows[0].total);
+      const now = new Date().toISOString();
+      await client.query(
+        'UPDATE indicadores SET "realizadoCentavos" = $1, "atualizadoEm" = $2 WHERE id = $3',
+        [totalRealizado, now, hist.indicadorId]
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    await logAudit(req.user!.id, 'DELETE', 'HistoricoIndicador', hist.id, hist, null, req.ip, req.headers['user-agent']);
+    res.json({ success: true, data: { id: hist.id } });
+  } catch (err) {
+    console.error('Erro ao excluir histórico:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });

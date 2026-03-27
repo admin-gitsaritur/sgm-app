@@ -52,6 +52,7 @@ export const updateIndicadorSchema = createIndicadorSchema.partial();
 
 export const updateRealizadoSchema = z.object({
     realizado: z.number().nonnegative('Não pode ser negativo').finite(),
+    data: z.string().optional(),
 });
 
 // ── Regex Helpers ─────────────────────────────────────────

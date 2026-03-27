@@ -19,7 +19,7 @@ import { CellText } from '../components/ui/CellText';
 import { toast } from '../components/ui/toast';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw } from 'lucide-react';
+import { Plus, BarChart2, DollarSign, Percent, Hash, UserCheck, RefreshCw, Clock } from 'lucide-react';
 import { UNIDADE_LABELS, isIntegerUnit, getDecimals, formatValue } from '../lib/formatUtils';
 
 // ── Constantes ────────────────────────────────────────────
@@ -79,6 +79,14 @@ export const Indicadores = () => {
   const [updatePeriodo, setUpdatePeriodo] = useState('');
   const [sortField, setSortField] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // History modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<any>(null);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [editingHist, setEditingHist] = useState<any>(null);
+  const [editHistValue, setEditHistValue] = useState('');
+  const [editHistDate, setEditHistDate] = useState('');
 
   const [form, setForm] = useState({
     projetoId: '', metaId: '', nome: '', metaIndicador: '', unidade: 'BRL',
@@ -181,13 +189,72 @@ export const Indicadores = () => {
     if (!updateTarget) return;
     setSaving(true);
     try {
+      // Calculate the date from period index
+      const freq = updateTarget.frequenciaAtualizacao || 'MENSAL';
+      const periodoIdx = parseInt(updatePeriodo) || 0;
+      const year = new Date().getFullYear();
+      let dataRef: string;
+      if (freq === 'MENSAL') {
+        dataRef = new Date(year, periodoIdx, 15).toISOString();
+      } else if (freq === 'TRIMESTRAL') {
+        dataRef = new Date(year, periodoIdx * 3 + 1, 15).toISOString();
+      } else if (freq === 'QUADRIMESTRAL') {
+        dataRef = new Date(year, periodoIdx * 4 + 2, 15).toISOString();
+      } else if (freq === 'SEMESTRAL') {
+        dataRef = new Date(year, periodoIdx * 6 + 3, 15).toISOString();
+      } else {
+        dataRef = new Date().toISOString();
+      }
+
       await api(`/indicadores/${updateTarget.id}/atualizar`, {
-        method: 'POST', body: JSON.stringify({ realizado: parseFloat(updateValue) }),
+        method: 'POST', body: JSON.stringify({ realizado: parseFloat(updateValue), data: dataRef }),
       });
       toast.success({ title: 'Realizado atualizado!' });
       setIsUpdateModalOpen(false); setUpdateTarget(null); fetchData();
     } catch (err: any) { toast.error({ title: err.message || 'Erro ao atualizar' }); }
     finally { setSaving(false); }
+  };
+
+  // ── History handlers ──
+  const openHistory = async (ind: any) => {
+    setHistoryTarget(ind);
+    setEditingHist(null);
+    try {
+      const res = await api(`/indicadores/${ind.id}/historico`);
+      if (res.success) setHistoryData(res.data);
+    } catch (err) { console.error(err); setHistoryData([]); }
+    setIsHistoryModalOpen(true);
+  };
+
+  const handleEditHist = async () => {
+    if (!editingHist) return;
+    setSaving(true);
+    try {
+      await api(`/indicadores/historico/${editingHist.id}`, {
+        method: 'PUT', body: JSON.stringify({ realizado: parseFloat(editHistValue), data: editHistDate }),
+      });
+      toast.success({ title: 'Registro atualizado!' });
+      setEditingHist(null);
+      // Refresh history and list
+      if (historyTarget) {
+        const res = await api(`/indicadores/${historyTarget.id}/historico`);
+        if (res.success) setHistoryData(res.data);
+      }
+      fetchData();
+    } catch (err: any) { toast.error({ title: err.message || 'Erro' }); }
+    finally { setSaving(false); }
+  };
+
+  const handleDeleteHist = async (histId: string) => {
+    try {
+      await api(`/indicadores/historico/${histId}`, { method: 'DELETE' });
+      toast.success({ title: 'Registro excluído!' });
+      if (historyTarget) {
+        const res = await api(`/indicadores/${historyTarget.id}/historico`);
+        if (res.success) setHistoryData(res.data);
+      }
+      fetchData();
+    } catch (err: any) { toast.error({ title: err.message || 'Erro' }); }
   };
 
   const handleDelete = async () => {
@@ -321,6 +388,15 @@ export const Indicadores = () => {
               }
               setUpdatePeriodo(periodoIdx.toString());
               setIsUpdateModalOpen(true);
+            }}
+          />
+          <ActionButton
+            icon="clock"
+            theme="sky"
+            title="Ver Histórico"
+            onClick={(e) => {
+              e.stopPropagation();
+              openHistory(row);
             }}
           />
           <ActionButton
@@ -603,6 +679,79 @@ export const Indicadores = () => {
               decimals={getDecimals(updateTarget?.unidade || 'BRL')}
             />
           </FormField>
+        </div>
+      </Modal>
+
+      {/* ── History Modal ── */}
+      <Modal
+        isOpen={isHistoryModalOpen}
+        onClose={() => { setIsHistoryModalOpen(false); setEditingHist(null); }}
+        title={`Histórico — ${historyTarget?.nome || ''}`}
+        size="lg"
+        footer={
+          <Button variant="outline" onClick={() => { setIsHistoryModalOpen(false); setEditingHist(null); }}>Fechar</Button>
+        }
+      >
+        <div className="space-y-4">
+          {historyData.length === 0 ? (
+            <p className="text-sm text-stone-400 text-center py-6">Nenhum lançamento registrado.</p>
+          ) : (
+            <div className="divide-y divide-stone-100 max-h-96 overflow-y-auto">
+              {historyData.map((h: any) => (
+                <div key={h.id} className="flex items-center justify-between py-3 px-1 gap-4">
+                  {editingHist?.id === h.id ? (
+                    <div className="flex-1 grid grid-cols-3 gap-2 items-end">
+                      <FormField label="Data">
+                        <Input type="date" size="sm" value={editHistDate.split('T')[0]}
+                          onChange={e => setEditHistDate(e.target.value + 'T12:00:00.000Z')} />
+                      </FormField>
+                      <FormField label="Valor">
+                        <CurrencyInput
+                          value={editHistValue}
+                          onChange={setEditHistValue}
+                          symbol={UNIDADE_LABELS[historyTarget?.unidade] || 'R$'}
+                          decimals={getDecimals(historyTarget?.unidade || 'BRL')}
+                        />
+                      </FormField>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="success" onClick={handleEditHist} isLoading={saving}>Salvar</Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingHist(null)}>✕</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-brown">
+                          {formatValue(h.valorCentavos, historyTarget?.unidade || 'BRL')}
+                        </p>
+                        <p className="text-xs text-stone-400">
+                          {new Date(h.data).toLocaleDateString('pt-BR')} • {h.atualizadoPorNome || 'Sistema'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ActionButton
+                          icon="edit"
+                          theme="orange"
+                          title="Editar"
+                          onClick={() => {
+                            setEditingHist(h);
+                            setEditHistValue((h.valorCentavos / 100).toString());
+                            setEditHistDate(h.data);
+                          }}
+                        />
+                        <ActionButton
+                          icon="trash"
+                          theme="rose"
+                          title="Excluir"
+                          onClick={() => handleDeleteHist(h.id)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal>
 
